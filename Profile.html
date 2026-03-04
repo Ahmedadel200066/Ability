@@ -1,0 +1,257 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Ultra Profile Setup</title>
+
+<style>
+:root{
+  --blue:#0A84FF;
+  --green:#30D158;
+  --glass:rgba(255,255,255,.65);
+  --border:rgba(255,255,255,.4);
+}
+
+*{box-sizing:border-box}
+
+body{
+  margin:0;
+  height:100vh;
+  display:flex;
+  justify-content:center;
+  align-items:center;
+  font-family:-apple-system,BlinkMacSystemFont,"SF Pro Display",sans-serif;
+  background:linear-gradient(135deg,#0f2027,#203a43,#2c5364);
+  overflow:hidden;
+}
+
+/* Floating gradient blobs */
+body::before, body::after{
+  content:"";
+  position:absolute;
+  width:400px;
+  height:400px;
+  background:radial-gradient(circle,#0A84FF,transparent);
+  filter:blur(120px);
+  animation:float 12s infinite alternate ease-in-out;
+}
+body::after{
+  background:radial-gradient(circle,#30D158,transparent);
+  right:-100px;
+  bottom:-100px;
+  animation-delay:3s;
+}
+@keyframes float{
+  from{transform:translateY(0)}
+  to{transform:translateY(-80px)}
+}
+
+/* Glass Card */
+.card{
+  width:390px;
+  height:820px;
+  backdrop-filter:blur(40px);
+  background:var(--glass);
+  border-radius:40px;
+  padding:40px 25px 120px;
+  border:1px solid var(--border);
+  box-shadow:0 40px 80px rgba(0,0,0,.3);
+  position:relative;
+  overflow:hidden;
+  animation:fade .6s ease;
+}
+@keyframes fade{
+  from{opacity:0;transform:translateY(30px)}
+  to{opacity:1}
+}
+
+h1{
+  margin:0 0 20px;
+  color:#fff;
+  font-size:28px;
+  font-weight:700;
+}
+
+/* Progress */
+.progress{
+  height:6px;
+  background:rgba(255,255,255,.2);
+  border-radius:10px;
+  margin-bottom:35px;
+}
+.progress span{
+  display:block;
+  height:100%;
+  width:40%;
+  background:#fff;
+  border-radius:10px;
+  transition:.4s;
+}
+
+/* Inputs */
+.field{
+  position:relative;
+  margin-bottom:30px;
+}
+.field input{
+  width:100%;
+  padding:18px;
+  border-radius:20px;
+  border:none;
+  outline:none;
+  font-size:16px;
+  backdrop-filter:blur(10px);
+  background:rgba(255,255,255,.8);
+  transition:.3s;
+}
+.field input:focus{
+  box-shadow:0 0 0 3px rgba(255,255,255,.6);
+}
+.field label{
+  position:absolute;
+  left:18px;
+  top:50%;
+  transform:translateY(-50%);
+  font-size:15px;
+  color:#555;
+  transition:.2s;
+}
+.field input:focus + label,
+.field input:not(:placeholder-shown)+label{
+  top:-8px;
+  font-size:12px;
+  background:#fff;
+  padding:0 6px;
+  border-radius:8px;
+}
+
+/* Shake animation */
+@keyframes shake{
+  0%,100%{transform:translateX(0)}
+  25%{transform:translateX(-6px)}
+  75%{transform:translateX(6px)}
+}
+.error{
+  animation:shake .3s;
+}
+
+/* Payment */
+.payment{
+  padding:18px;
+  border-radius:24px;
+  background:rgba(255,255,255,.85);
+  display:flex;
+  justify-content:space-between;
+  align-items:center;
+  cursor:pointer;
+  transition:.3s;
+}
+.payment:hover{
+  transform:scale(1.03);
+}
+.money{
+  background:var(--green);
+  width:45px;height:45px;
+  border-radius:14px;
+  display:flex;
+  justify-content:center;
+  align-items:center;
+  color:#fff;
+  font-size:20px;
+}
+
+/* Button */
+button{
+  position:absolute;
+  bottom:40px;
+  left:25px;
+  right:25px;
+  height:60px;
+  border:none;
+  border-radius:25px;
+  font-size:18px;
+  font-weight:600;
+  color:#fff;
+  background:linear-gradient(135deg,#0A84FF,#30D158);
+  cursor:pointer;
+  transition:.3s;
+  opacity:.5;
+  pointer-events:none;
+}
+button.active{
+  opacity:1;
+  pointer-events:auto;
+}
+button:active{
+  transform:scale(.96);
+}
+</style>
+</head>
+<body>
+
+<div class="card">
+
+<h1>Set Up Profile</h1>
+<div class="progress"><span id="bar"></span></div>
+
+<div class="field">
+  <input type="text" id="name" placeholder=" " required>
+  <label>Full Name</label>
+</div>
+
+<div class="field">
+  <input type="tel" id="phone" placeholder=" " required>
+  <label>Phone Number</label>
+</div>
+
+<div class="field">
+  <input type="email" id="email" placeholder=" " required>
+  <label>Email Address</label>
+</div>
+
+<div class="payment">
+  <div style="display:flex;gap:12px;align-items:center">
+    <div class="money">💵</div>
+    <div>
+      <strong>Cash</strong><br>
+      <small>Payment Method</small>
+    </div>
+  </div>
+  <span>Selected</span>
+</div>
+
+<button id="btn">Continue</button>
+
+</div>
+
+<script>
+const inputs=[...document.querySelectorAll("input")];
+const btn=document.getElementById("btn");
+const bar=document.getElementById("bar");
+
+function validate(){
+  let filled=inputs.filter(i=>i.value.trim()!=="").length;
+  bar.style.width=(filled/3*100)+"%";
+
+  const emailRegex=/^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
+  if(
+    inputs[0].value.length>2 &&
+    inputs[1].value.length>=10 &&
+    emailRegex.test(inputs[2].value)
+  ){
+    btn.classList.add("active");
+  }else{
+    btn.classList.remove("active");
+  }
+}
+
+inputs.forEach(i=>{
+  i.addEventListener("input",validate);
+  i.addEventListener("invalid",()=>i.parentElement.classList.add("error"));
+});
+</script>
+
+</body>
+</html>

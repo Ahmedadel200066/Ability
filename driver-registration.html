@@ -1,0 +1,253 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Elite Driver Registration</title>
+
+<style>
+:root{
+  --accent:#4F8CFF;
+  --green:#22C55E;
+  --glass:rgba(255,255,255,.12);
+  --border:rgba(255,255,255,.25);
+}
+
+*{box-sizing:border-box}
+
+body{
+  margin:0;
+  height:100vh;
+  display:flex;
+  justify-content:center;
+  align-items:center;
+  font-family:-apple-system,BlinkMacSystemFont,"SF Pro Display",sans-serif;
+  background:radial-gradient(circle at 20% 30%,#1e3c72,#2a5298 40%,#0f2027 90%);
+  overflow:hidden;
+}
+
+/* Floating glow */
+body::before{
+  content:"";
+  position:absolute;
+  width:500px;
+  height:500px;
+  background:radial-gradient(circle,#4F8CFF,transparent);
+  filter:blur(150px);
+  animation:float 10s infinite alternate ease-in-out;
+}
+@keyframes float{
+  from{transform:translateY(0)}
+  to{transform:translateY(-80px)}
+}
+
+/* Glass Card */
+.card{
+  width:420px;
+  height:880px;
+  backdrop-filter:blur(35px);
+  background:var(--glass);
+  border-radius:45px;
+  padding:40px 28px 130px;
+  border:1px solid var(--border);
+  box-shadow:0 50px 100px rgba(0,0,0,.5);
+  color:#fff;
+  position:relative;
+  animation:fade .7s ease;
+}
+@keyframes fade{
+  from{opacity:0;transform:translateY(30px)}
+  to{opacity:1}
+}
+
+h1{
+  margin:0 0 30px;
+  font-size:28px;
+  font-weight:700;
+}
+
+/* Inputs */
+.input{
+  margin-bottom:22px;
+}
+.input input{
+  width:100%;
+  padding:18px;
+  border-radius:20px;
+  border:none;
+  outline:none;
+  font-size:16px;
+  background:rgba(255,255,255,.9);
+  color:#111;
+  transition:.3s;
+}
+.input input:focus{
+  box-shadow:0 0 0 3px rgba(79,140,255,.4);
+}
+
+/* Upload */
+.upload{
+  margin-top:25px;
+  border:2px dashed rgba(255,255,255,.4);
+  border-radius:25px;
+  padding:35px;
+  text-align:center;
+  cursor:pointer;
+  transition:.3s;
+  position:relative;
+}
+.upload:hover{
+  border-color:#fff;
+  background:rgba(255,255,255,.08);
+  transform:scale(1.02);
+}
+.upload input{display:none}
+
+.upload-icon{
+  font-size:32px;
+  margin-bottom:10px;
+}
+
+.progress{
+  height:6px;
+  background:rgba(255,255,255,.2);
+  border-radius:10px;
+  margin-top:15px;
+  overflow:hidden;
+}
+.progress span{
+  display:block;
+  height:100%;
+  width:0%;
+  background:#4F8CFF;
+  transition:.4s;
+}
+
+/* Secure Badge */
+.secure{
+  margin-top:15px;
+  font-size:13px;
+  display:flex;
+  align-items:center;
+  gap:8px;
+  opacity:.8;
+}
+
+/* Button */
+button{
+  position:absolute;
+  bottom:40px;
+  left:28px;
+  right:28px;
+  height:60px;
+  border:none;
+  border-radius:28px;
+  font-size:18px;
+  font-weight:600;
+  color:#fff;
+  background:linear-gradient(135deg,#4F8CFF,#22C55E);
+  cursor:pointer;
+  transition:.3s;
+  opacity:.5;
+  pointer-events:none;
+}
+button.active{
+  opacity:1;
+  pointer-events:auto;
+}
+button:active{
+  transform:scale(.96);
+}
+</style>
+</head>
+<body>
+
+<div class="card">
+
+<h1>Elite Driver Onboarding</h1>
+
+<div class="input">
+  <input type="text" id="name" placeholder="Full Name">
+</div>
+
+<div class="input">
+  <input type="tel" id="phone" placeholder="Phone Number">
+</div>
+
+<label class="upload">
+  <div class="upload-icon">📷</div>
+  <strong>Driver's License</strong><br>
+  <small>Drag & drop or tap to upload</small>
+  <input type="file" id="license" accept="image/*">
+  <div class="progress"><span id="prog1"></span></div>
+</label>
+
+<label class="upload">
+  <div class="upload-icon">📄</div>
+  <strong>Car Insurance</strong><br>
+  <small>Upload PDF or Image</small>
+  <input type="file" id="insurance" accept="image/*,application/pdf">
+  <div class="progress"><span id="prog2"></span></div>
+</label>
+
+<div class="secure">🛡️ End-to-End Encrypted & Secure Verification</div>
+
+<button id="submit">Submit for Review</button>
+
+</div>
+
+<script>
+const nameInput=document.getElementById("name");
+const phoneInput=document.getElementById("phone");
+const license=document.getElementById("license");
+const insurance=document.getElementById("insurance");
+const btn=document.getElementById("submit");
+const prog1=document.getElementById("prog1");
+const prog2=document.getElementById("prog2");
+
+function validate(){
+  if(
+    nameInput.value.length>2 &&
+    phoneInput.value.length>=10 &&
+    license.files.length>0 &&
+    insurance.files.length>0
+  ){
+    btn.classList.add("active");
+  }else{
+    btn.classList.remove("active");
+  }
+}
+
+function simulateProgress(bar){
+  let width=0;
+  let interval=setInterval(()=>{
+    width+=10;
+    bar.style.width=width+"%";
+    if(width>=100) clearInterval(interval);
+  },80);
+}
+
+license.addEventListener("change",()=>{
+  simulateProgress(prog1);
+  validate();
+});
+insurance.addEventListener("change",()=>{
+  simulateProgress(prog2);
+  validate();
+});
+
+[nameInput,phoneInput].forEach(i=>{
+  i.addEventListener("input",validate);
+});
+
+btn.addEventListener("click",()=>{
+  btn.innerText="Verifying...";
+  setTimeout(()=>{
+    btn.style.background="#22C55E";
+    btn.innerText="Approved ✓";
+  },1500);
+});
+</script>
+
+</body>
+</html>

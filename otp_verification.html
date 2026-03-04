@@ -1,0 +1,144 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Ultra Pulse OTP Screen</title>
+<style>
+:root{
+  --blue:#007AFF;
+  --deep:#1C2541;
+  --gray:#8E8E93;
+  --white:#FFFFFF;
+  --shadow:0 10px 20px rgba(0,0,0,.08);
+}
+*{box-sizing:border-box;margin:0;padding:0;}
+body{
+  font-family:-apple-system,BlinkMacSystemFont,"SF Pro Text",sans-serif;
+  background:#f2f4f8; display:flex; justify-content:center; align-items:center;
+  height:100vh;
+}
+.container{
+  width:390px; height:844px; border-radius:50px; background:var(--white);
+  box-shadow:0 0 40px rgba(0,0,0,.15); padding:40px 24px; display:flex; flex-direction:column;
+  justify-content:center; align-items:center;
+}
+h1{font-size:24px; font-weight:700; color:var(--deep); margin-bottom:8px;}
+p{font-size:16px; color:var(--gray); text-align:center; margin-bottom:32px;}
+.otp-inputs{
+  display:flex; justify-content:space-between; width:80%; margin-bottom:24px;
+}
+.otp-input{
+  width:50px; height:50px; border-radius:12px; border:1px solid #d1d1d6;
+  text-align:center; font-size:24px; font-weight:600; color:var(--deep);
+  outline:none; transition:0.3s; background:#fff;
+}
+.otp-input:focus{
+  border-color:var(--blue);
+  box-shadow:0 0 12px rgba(0,122,255,.5);
+  animation: pulseInput 1s infinite;
+}
+@keyframes pulseInput{
+  0%{box-shadow:0 0 8px rgba(0,122,255,.4);}
+  50%{box-shadow:0 0 16px rgba(0,122,255,.7);}
+  100%{box-shadow:0 0 8px rgba(0,122,255,.4);}
+}
+.bottom-text{
+  display:flex; justify-content:space-between; width:80%; margin-bottom:40px;
+  font-size:14px; color:var(--blue); cursor:pointer;
+}
+.verify-btn{
+  width:80%; padding:16px 0; border:none; border-radius:30px;
+  background:var(--blue); color:var(--white); font-size:18px; font-weight:700;
+  box-shadow:var(--shadow); cursor:pointer; transition:.3s;
+}
+.verify-btn.glow{
+  animation: pulseVerify 1.5s infinite;
+}
+@keyframes pulseVerify{
+  0%{box-shadow:0 0 15px rgba(0,122,255,0.4);}
+  50%{box-shadow:0 0 25px rgba(0,122,255,0.7);}
+  100%{box-shadow:0 0 15px rgba(0,122,255,0.4);}
+}
+.verify-btn:hover{background:#005BB5;}
+.verify-btn:active{transform:scale(0.97);}
+.countdown{color:var(--gray);}
+</style>
+</head>
+<body>
+<div class="container">
+  <h1>Verify Phone Number</h1>
+  <p>Enter the code sent to your phone</p>
+  <div class="otp-inputs">
+    <input type="text" maxlength="1" class="otp-input">
+    <input type="text" maxlength="1" class="otp-input">
+    <input type="text" maxlength="1" class="otp-input">
+    <input type="text" maxlength="1" class="otp-input">
+    <input type="text" maxlength="1" class="otp-input">
+    <input type="text" maxlength="1" class="otp-input">
+  </div>
+  <div class="bottom-text">
+    <span id="resend">Resend Code</span>
+    <span class="countdown" id="timer">00:30</span>
+  </div>
+  <button class="verify-btn" id="verifyBtn">Verify</button>
+</div>
+
+<script>
+// OTP Automatic focus & pulse
+const inputs = document.querySelectorAll('.otp-input');
+const verifyBtn = document.getElementById('verifyBtn');
+
+inputs.forEach((input, i)=>{
+  input.addEventListener('input', ()=>{
+    if(input.value.length===1 && i<inputs.length-1){inputs[i+1].focus();}
+    toggleVerifyGlow();
+  });
+  input.addEventListener('keydown', e=>{
+    if(e.key==='Backspace' && !input.value && i>0){inputs[i-1].focus();}
+    toggleVerifyGlow();
+  });
+});
+
+function toggleVerifyGlow(){
+  let anyFocused = Array.from(inputs).some(inp=>document.activeElement===inp);
+  if(anyFocused){verifyBtn.classList.add('glow');}
+  else{verifyBtn.classList.remove('glow');}
+}
+
+// Countdown Timer & Resend
+let time = 30;
+const timer = document.getElementById('timer');
+const resend = document.getElementById('resend');
+resend.style.pointerEvents='none'; resend.style.opacity='0.5';
+
+let countdown = setInterval(()=>{
+  time--;
+  timer.textContent=`00:${time<10?'0'+time:time}`;
+  if(time<=0){
+    clearInterval(countdown);
+    resend.style.pointerEvents='auto';
+    resend.style.opacity='1';
+    timer.textContent='00:00';
+  }
+},1000);
+
+resend.addEventListener('click', ()=>{
+  time=30;
+  timer.textContent='00:30';
+  resend.style.pointerEvents='none';
+  resend.style.opacity='0.5';
+  countdown=setInterval(()=>{
+    time--;
+    timer.textContent=`00:${time<10?'0'+time:time}`;
+    if(time<=0){
+      clearInterval(countdown);
+      resend.style.pointerEvents='auto';
+      resend.style.opacity='1';
+      timer.textContent='00:00';
+    }
+  },1000);
+});
+</script>
+</body>
+</html>

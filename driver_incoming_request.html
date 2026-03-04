@@ -1,0 +1,99 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>Driver Incoming Request - Live Ultra 3D</title>
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<style>
+body{margin:0;font-family:-apple-system,BlinkMacSystemFont,"SF Pro Text",sans-serif;background:#000;overflow:hidden;}
+#map{height:100vh;width:100%;}
+.card{position:absolute;bottom:0;width:100%;background:rgba(28,28,30,0.95);color:#fff;padding:20px;border-top-left-radius:25px;border-top-right-radius:25px;box-shadow:0 -10px 40px rgba(0,0,0,.8);transform:translateY(100%);transition:transform .5s;}
+.card.show{transform:translateY(0);}
+.passenger{font-size:24px;font-weight:800;}
+.rating{color:#34C759;margin-bottom:10px;}
+.details{display:flex;justify-content:space-between;margin-top:10px;}
+.buttons{display:flex;gap:15px;margin-top:15px;}
+button{flex:1;padding:15px;font-size:18px;font-weight:800;border:none;border-radius:15px;cursor:pointer;transition:.3s transform,.3s box-shadow;perspective:1000px;}
+.accept{background:#34C759;color:#fff;box-shadow:0 0 25px #34C759;}
+.decline{background:#FF3B30;color:#fff;box-shadow:0 0 25px #FF3B30;}
+.accept:active{transform:rotateX(10deg) scale(1.07);box-shadow:0 0 35px #34C759;}
+.decline:active{transform:rotateX(10deg) scale(1.07);box-shadow:0 0 35px #FF3B30;}
+</style>
+</head>
+<body>
+
+<div id="map"></div>
+
+<div class="card" id="requestCard">
+  <div class="passenger" id="passengerName">Ahmed Ali</div>
+  <div class="rating">⭐ 4.9</div>
+  <div id="pickupLocation">Pickup: Downtown Cairo</div>
+  <div class="details">
+    <span id="distance">Distance: --</span>
+    <span id="eta">ETA: --</span>
+  </div>
+  <div class="details">
+    <span id="fare">Fare: --</span>
+  </div>
+  <div class="buttons">
+    <button class="accept">Accept</button>
+    <button class="decline">Decline</button>
+  </div>
+</div>
+
+<script>
+let map, directionsService, directionsRenderer, driverMarker, passengerMarker;
+
+function initMap() {
+  map = new google.maps.Map(document.getElementById("map"), {
+    zoom: 14,
+    center: { lat: 30.0444, lng: 31.2357 },
+    styles:[{elementType:"geometry",stylers:[{color:"#1d1d1d"}]}]
+  });
+
+  directionsService = new google.maps.DirectionsService();
+  directionsRenderer = new google.maps.DirectionsRenderer({suppressMarkers:true});
+  directionsRenderer.setMap(map);
+
+  // موقع السائق الحالي
+  if (navigator.geolocation){
+    navigator.geolocation.getCurrentPosition(position=>{
+      const driverLoc={lat:position.coords.latitude,lng:position.coords.longitude};
+      const pickupLoc={lat:30.0500,lng:31.2333};
+
+      driverMarker = new google.maps.Marker({position:driverLoc,map:map,label:"🚗"});
+      passengerMarker = new google.maps.Marker({position:pickupLoc,map:map,label:"🧍",animation:google.maps.Animation.BOUNCE});
+
+      calculateRoute(driverLoc,pickupLoc);
+      document.getElementById('requestCard').classList.add('show');
+
+      // Incoming Request sound + vibration
+      console.log("🔔 Incoming Request! Simulated vibration & sound");
+    });
+  }
+}
+
+function calculateRoute(origin,destination){
+  directionsService.route({origin,destination,travelMode:"DRIVING"},(result,status)=>{
+    if(status==="OK"){
+      directionsRenderer.setDirections(result);
+      const route=result.routes[0].legs[0];
+      const distance=route.distance.text;
+      const duration=route.duration.text;
+      document.getElementById("distance").innerText="Distance: "+distance;
+      document.getElementById("eta").innerText="ETA: "+duration;
+
+      const km=route.distance.value/1000;
+      const estimatedFare=Math.round(15+(km*8));
+      document.getElementById("fare").innerText="Fare: EGP "+estimatedFare;
+    }
+  });
+}
+</script>
+
+<script async
+src="https://maps.googleapis.com/maps/api/js?key=YOUR_API_KEY_HERE&callback=initMap">
+</script>
+
+</body>
+</html>

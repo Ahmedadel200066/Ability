@@ -1,0 +1,143 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Driver Onboarding</title>
+
+<style>
+body {
+    margin: 0;
+    font-family: -apple-system, BlinkMacSystemFont, "San Francisco", Arial;
+    background: #ffffff;
+    padding: 20px;
+}
+
+.container {
+    max-width: 420px;
+    margin: auto;
+}
+
+h1 {
+    font-size: 24px;
+    margin-bottom: 25px;
+    color: #111;
+}
+
+label {
+    font-size: 14px;
+    font-weight: 600;
+    margin-bottom: 6px;
+    display: block;
+    color: #333;
+}
+
+input {
+    width: 100%;
+    padding: 14px;
+    margin-bottom: 18px;
+    border-radius: 12px;
+    border: 1px solid #dcdcdc;
+    font-size: 16px;
+    transition: 0.2s ease;
+}
+
+input:focus {
+    border-color: #007aff;
+    outline: none;
+    box-shadow: 0 0 0 3px rgba(0,122,255,0.15);
+}
+
+/* Upload Tiles */
+.upload-section {
+    margin-top: 10px;
+}
+
+.upload-tile {
+    border: 2px dashed #007aff;
+    border-radius: 16px;
+    padding: 25px;
+    text-align: center;
+    margin-bottom: 15px;
+    cursor: pointer;
+    transition: 0.2s ease;
+    background: #f4f9ff;
+}
+
+.upload-tile:hover {
+    background: #e8f2ff;
+}
+
+.upload-icon {
+    font-size: 32px;
+    margin-bottom: 10px;
+}
+
+.upload-title {
+    font-weight: 600;
+    color: #007aff;
+}
+
+.hidden-input {
+    display: none;
+}
+
+/* Submit Button */
+.submit-btn {
+    width: 100%;
+    padding: 16px;
+    background: #007aff;
+    color: white;
+    font-size: 17px;
+    border: none;
+    border-radius: 14px;
+    margin-top: 15px;
+    cursor: pointer;
+    transition: 0.2s ease;
+}
+
+.submit-btn:hover {
+    background: #0063d1;
+}
+</style>
+</head>
+
+<body>
+
+<div class="container">
+    <h1>Driver Onboarding</h1>
+
+    <form>
+        <label>Vehicle Model</label>
+        <input type="text" placeholder="e.g., Toyota Camry" required>
+
+        <label>Plate Number</label>
+        <input type="text" placeholder="ABC 123" required>
+
+        <label>Car Year</label>
+        <input type="number" placeholder="e.g., 2022" required>
+
+        <div class="upload-section">
+
+            <label>Driver’s License</label>
+            <div class="upload-tile" onclick="document.getElementById('license').click()">
+                <div class="upload-icon">📷</div>
+                <div class="upload-title">Upload Driver’s License</div>
+            </div>
+            <input type="file" id="license" class="hidden-input" accept="image/*">
+
+            <label>Vehicle Insurance</label>
+            <div class="upload-tile" onclick="document.getElementById('insurance').click()">
+                <div class="upload-icon">📷</div>
+                <div class="upload-title">Upload Vehicle Insurance</div>
+            </div>
+            <input type="file" id="insurance" class="hidden-input" accept="image/*">
+
+        </div>
+
+        <button type="submit" class="submit-btn">Submit Application</button>
+    </form>
+</div>
+
+</body>
+</html>
