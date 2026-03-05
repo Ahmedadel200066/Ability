@@ -1,7 +1,7 @@
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
-import 'package:cloud_firestore/cloud_firestore.dart';
+import '../../mock/mock_firestore.dart';
 
 class PremiumDriverOnTheWay extends StatefulWidget {
   final String tripId;

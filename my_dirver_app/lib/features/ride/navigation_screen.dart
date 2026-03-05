@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
-import 'package:cloud_firestore/cloud_firestore.dart';
+import '../../mock/mock_firestore.dart';
 import 'package:url_launcher/url_launcher.dart'; // تأكد من إضافة الاعتماد في pubspec.yaml
 
 class NavigationScreen extends StatefulWidget {

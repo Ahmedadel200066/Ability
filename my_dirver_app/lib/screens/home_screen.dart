@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
-import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:firebase_auth/firebase_auth.dart';
+import '../mock/mock_firestore.dart';
+import '../mock/mock_auth.dart';
 import '../features/ride/ride_request_overlay.dart';
 
 class HomeScreen extends StatefulWidget {
