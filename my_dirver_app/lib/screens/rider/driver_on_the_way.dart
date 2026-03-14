@@ -24,11 +24,11 @@ class _PremiumDriverOnTheWayState extends State<PremiumDriverOnTheWay> {
             .doc(widget.tripId)
             .snapshots(),
         builder: (context, snapshot) {
-          if (!snapshot.hasData || snapshot.data?.data() == null) {
+          if (!snapshot.hasData || snapshot.data?.data == null) {
             return const Center(child: CircularProgressIndicator());
           }
 
-          var tripData = snapshot.data!.data() as Map<String, dynamic>;
+          var tripData = snapshot.data!.data as Map<String, dynamic>;
 
           LatLng driverPos = LatLng(
             tripData['driverLocation']?['lat'] ?? pickupLocation.latitude,

@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
 import 'package:google_fonts/google_fonts.dart';
-import '../../mock/mock_firestore.dart'; // تأكد من إضافة هذا الـ Import
+import '../../mock/mock_firestore.dart';
 
 class DriverHomeScreen extends StatefulWidget {
   const DriverHomeScreen({super.key});
@@ -58,8 +58,8 @@ class _DriverHomeScreenState extends State<DriverHomeScreen> {
       builder: (context, snapshot) {
         if (snapshot.hasData && snapshot.data!.docs.isNotEmpty) {
           // جلب بيانات أول رحلة منتظرة
-          var tripData = snapshot.data!.docs.first;
-          return _buildRequestCard(tripData);
+          var tripDoc = snapshot.data!.docs.first;
+          return _buildRequestCard(tripDoc);
         }
         // في حال عدم وجود طلبات حالياً
         return Container(
@@ -69,7 +69,11 @@ class _DriverHomeScreenState extends State<DriverHomeScreen> {
           child: Row(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              const CircularProgressIndicator(strokeWidth: 2),
+              const SizedBox(
+                width: 20,
+                height: 20,
+                child: CircularProgressIndicator(strokeWidth: 2),
+              ),
               const SizedBox(width: 15),
               Text("بانتظار طلبات قريبة...", style: GoogleFonts.cairo()),
             ],
@@ -91,7 +95,7 @@ class _DriverHomeScreenState extends State<DriverHomeScreen> {
           decoration: BoxDecoration(
             color: isOnline ? Colors.green : Colors.redAccent,
             borderRadius: BorderRadius.circular(30),
-            boxShadow: [BoxShadow(color: Colors.black26, blurRadius: 10)],
+            boxShadow: const [BoxShadow(color: Colors.black26, blurRadius: 10)],
           ),
           child: Row(
             mainAxisAlignment: MainAxisAlignment.center,
@@ -126,14 +130,14 @@ class _DriverHomeScreenState extends State<DriverHomeScreen> {
   }
 
   Widget _buildRequestCard(DocumentSnapshot trip) {
-    Map<String, dynamic> data = trip.data() as Map<String, dynamic>;
+    Map<String, dynamic> data = trip.data;
 
     return Container(
       padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(25),
-        boxShadow: [BoxShadow(color: Colors.black12, blurRadius: 20)],
+        boxShadow: const [BoxShadow(color: Colors.black12, blurRadius: 20)],
       ),
       child: Column(
         mainAxisSize: MainAxisSize.min,

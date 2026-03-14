@@ -2,13 +2,10 @@ plugins {
     id("com.android.application")
     id("kotlin-android")
     id("dev.flutter.flutter-gradle-plugin")
-    // فكي التعليق عن السطر التالي فقط بعد إضافة ملف google-services.json
-    // id("com.google.gms.google-services")
 }
 
 android {
-    // تأكدي أن الـ namespace مطابق لاسم مشروعك (Elite Rider)
-    namespace = "com.example.elite_rider_app" 
+    namespace = "com.example.elite_rider_app"
     compileSdk = flutter.compileSdkVersion
     ndkVersion = flutter.ndkVersion
 
@@ -22,25 +19,16 @@ android {
     }
 
     defaultConfig {
-        // الـ Application ID هو المعرف الوحيد لتطبيقك في متجر جوجل
         applicationId = "com.example.elite_rider_app"
-        
-        // تم التعديل لـ 21 لضمان عمل الخرائط وخدمات الموقع بسلاسة
-        minSdk = 21 
-        
+        minSdk = flutter.minSdkVersion
         targetSdk = flutter.targetSdkVersion
-        versionCode = flutterVersionCode.toInteger()
-        versionName = flutterVersionName
+        versionCode = 1
+        versionName = "1.0.0"
     }
 
     buildTypes {
         release {
-            // في المرحلة الحالية نستخدم إعدادات الديباج للتجربة
-            signingConfig = signingConfigs.debug
-            
-            // إضافة لتحسين الأداء وتقليل حجم التطبيق
-            minifyEnabled = false
-            shrinkResources = false
+            signingConfig = signingConfigs.getByName("debug")
         }
     }
 }

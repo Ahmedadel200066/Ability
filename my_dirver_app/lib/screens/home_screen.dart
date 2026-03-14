@@ -28,7 +28,8 @@ class _HomeScreenState extends State<HomeScreen> {
 
   // تحديث حالة السائق
   void toggleStatus(bool value) async {
-    if (driverId == null) return;
+    final currentDriverId = driverId;
+    if (currentDriverId == null) return;
 
     setState(() {
       isOnline = value;
@@ -37,7 +38,7 @@ class _HomeScreenState extends State<HomeScreen> {
     try {
       await FirebaseFirestore.instance
           .collection('drivers')
-          .doc(driverId)
+          .doc(currentDriverId)
           .update({
         'isOnline': value,
         'lastUpdate': FieldValue.serverTimestamp(),
@@ -48,10 +49,10 @@ class _HomeScreenState extends State<HomeScreen> {
           : "تم تسجيل الخروج من الخدمة");
     } catch (e) {
       // إذا لم يكن المستند موجوداً، ننشئه
-      await FirebaseFirestore.instance.collection('drivers').doc(driverId).set({
+      await FirebaseFirestore.instance.collection('drivers').doc(currentDriverId).set({
         'isOnline': value,
         'lastUpdate': FieldValue.serverTimestamp(),
-      }, SetOptions(merge: true));
+      });
     }
   }
 
