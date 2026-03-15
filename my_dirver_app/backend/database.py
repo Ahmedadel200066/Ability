@@ -1,12 +1,7 @@
 from sqlalchemy import create_engine
-from sqlalchemy.orm import sessionmaker
-from sqlalchemy.orm import declarative_base
-import os
-from dotenv import load_dotenv
+from sqlalchemy.orm import sessionmaker, declarative_base
 
-load_dotenv()
-
-DATABASE_URL = os.getenv("DATABASE_URL")
+DATABASE_URL = "postgresql://postgres:1032@localhost:5432/uber_clone"
 
 engine = create_engine(DATABASE_URL)
 
