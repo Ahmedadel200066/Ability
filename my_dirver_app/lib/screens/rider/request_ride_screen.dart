@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
-import '../../mock/mock_firestore.dart';
-// ملاحظة: تأكد أن ملف searching_driver_screen.dart موجود في نفس المجلد
+import 'package:supabase_flutter/supabase_flutter.dart'; // تم التغيير من Firebase إلى Supabase
 import 'searching_driver_screen.dart';
 
 class RequestRideScreen extends StatefulWidget {
@@ -14,46 +13,51 @@ class RequestRideScreen extends StatefulWidget {
 class _RequestRideScreenState extends State<RequestRideScreen> {
   String selectedVehicle = "Elite X";
   bool _isLoading = false;
+  final _supabase = Supabase.instance.client;
 
-  // دالة إرسال الطلب
+  // دالة إرسال الطلب المعدلة لتعمل مع Supabase
   Future<void> _sendRideRequest() async {
     if (_isLoading) return;
 
     setState(() => _isLoading = true);
 
     try {
-      // 1. إرسال البيانات لـ Firestore
-      DocumentReference docRef =
-          await FirebaseFirestore.instance.collection('trips').add({
-        'riderName': 'رامي محمد',
-        'riderId': 'rider_123',
-        'pickupAddress': 'المعادي - شارع 9',
-        'dropoffAddress': 'مطار القاهرة الدولي',
-        'status': 'pending',
-        'price': selectedVehicle == "Elite X" ? 150.0 : 250.0,
-        'vehicleType': selectedVehicle,
-        'createdAt': FieldValue.serverTimestamp(),
-      });
+      final user = _supabase.auth.currentUser;
 
-      // 2. حماية الـ BuildContext (Async Gap)
+      if (user == null) {
+        throw Exception("يجب تسجيل الدخول أولاً");
+      }
+
+      // 1. إرسال البيانات لجدول 'rides' في Supabase
+      // ملاحظة: نستخدم insert().select().single() للحصول على بيانات الصف المضاف فوراً
+      final response = await _supabase.from('rides').insert({
+        'rider_id': user.id,
+        'rider_name': 'إيمان سالم', // يمكنك جلب الاسم الحقيقي من البروفايل لاحقاً
+        'pickup_address': 'المعادي - شارع 9',
+        'destination_name': 'مطار القاهرة الدولي',
+        'status': 'searching', // الحالة الابتدائية
+        'price': selectedVehicle == "Elite X" ? 150.0 : 250.0,
+        'vehicle_type': selectedVehicle,
+        'created_at': DateTime.now().toIso8601String(),
+      }).select().single();
+
       if (!mounted) return;
 
-      // 3. الانتقال للشاشة التالية
+      // 2. الانتقال للشاشة التالية مع تمرير الـ ID الجديد من سوبابيز
       Navigator.push(
         context,
         MaterialPageRoute(
-          builder: (context) => SearchingDriverScreen(tripId: docRef.id),
+          builder: (context) => SearchingDriverScreen(tripId: response['id'].toString()),
         ),
       );
     } catch (e) {
-      // حماية الـ BuildContext عند الخطأ
       if (!mounted) return;
 
       setState(() => _isLoading = false);
 
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text("حدث خطأ: ${e.toString()}", style: GoogleFonts.cairo()),
+          content: Text("حدث خطأ في الطلب: ${e.toString()}", style: GoogleFonts.cairo()),
           backgroundColor: Colors.redAccent,
         ),
       );
@@ -75,7 +79,6 @@ class _RequestRideScreenState extends State<RequestRideScreen> {
         padding: const EdgeInsets.all(20.0),
         child: Column(
           children: [
-            // عرض العناوين بشكل مبسط
             _buildLocationTile(
                 Icons.my_location, "المعادي - شارع 9", Colors.blue),
             const Divider(height: 30),
@@ -84,14 +87,12 @@ class _RequestRideScreenState extends State<RequestRideScreen> {
 
             const Spacer(),
 
-            // اختيار نوع السيارة
             _buildVehicleOption("Elite X", "150 جـ", Icons.directions_car),
             const SizedBox(height: 10),
             _buildVehicleOption("Elite Black", "250 جـ", Icons.business),
 
             const SizedBox(height: 30),
 
-            // زر التأكيد
             SizedBox(
               width: double.infinity,
               height: 60,
@@ -135,7 +136,7 @@ class _RequestRideScreenState extends State<RequestRideScreen> {
         padding: const EdgeInsets.all(15),
         decoration: BoxDecoration(
           color: isSelected
-              ? Colors.blue.withValues(alpha: 0.1)
+              ? Colors.blue.withOpacity(0.1)
               : Colors.grey[100],
           borderRadius: BorderRadius.circular(15),
           border:

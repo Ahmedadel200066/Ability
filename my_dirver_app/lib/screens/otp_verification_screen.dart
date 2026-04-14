@@ -1,9 +1,13 @@
 import 'package:flutter/material.dart';
 import 'dart:async';
-import 'onboarding_details_screen.dart'; // تأكد من مطابقة اسم الملف في مشروعك
+import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:google_fonts/google_fonts.dart';
+import 'onboarding_details_screen.dart';
 
 class OtpVerificationScreen extends StatefulWidget {
-  const OtpVerificationScreen({super.key});
+  final String phone; // نمرر رقم الهاتف للشاشة
+
+  const OtpVerificationScreen({super.key, required this.phone});
 
   @override
   State<OtpVerificationScreen> createState() => _OtpVerificationScreenState();
@@ -11,19 +15,18 @@ class OtpVerificationScreen extends StatefulWidget {
 
 class _OtpVerificationScreenState extends State<OtpVerificationScreen>
     with SingleTickerProviderStateMixin {
-  // التحكم في مربعات الـ OTP
+  final _supabase = Supabase.instance.client;
   final List<FocusNode> _focusNodes = List.generate(6, (index) => FocusNode());
   final List<TextEditingController> _controllers = List.generate(
     6,
     (index) => TextEditingController(),
   );
 
-  // مؤقت العد التنازلي
   Timer? _timer;
   int _start = 30;
   bool _canResend = false;
+  bool _isLoading = false;
 
-  // تأثير النبض (Pulse Animation) للزر
   late AnimationController _pulseController;
 
   @override
@@ -36,35 +39,75 @@ class _OtpVerificationScreenState extends State<OtpVerificationScreen>
     )..repeat(reverse: true);
   }
 
+  // دالة التحقق من الكود في سوبابيز
+  Future<void> _verifyOtp() async {
+    String otpCode = _controllers.map((controller) => controller.text).join();
+
+    if (otpCode.length < 6) {
+      _showSnackBar("برجاء إدخال الكود كاملاً");
+      return;
+    }
+
+    setState(() => _isLoading = true);
+
+    try {
+      final response = await _supabase.auth.verifyOTP(
+        phone: widget.phone,
+        token: otpCode,
+        type: OtpType.sms,
+      );
+
+      if (response.session != null) {
+        if (mounted) {
+          Navigator.pushReplacement(
+            context,
+            MaterialPageRoute(
+              builder: (context) => const OnboardingDetailsScreen(),
+            ),
+          );
+        }
+      }
+    } catch (e) {
+      _showSnackBar("الكود غير صحيح أو انتهت صلاحيته");
+    } finally {
+      if (mounted) setState(() => _isLoading = false);
+    }
+  }
+
+  // إعادة إرسال الكود
+  Future<void> _resendCode() async {
+    try {
+      await _supabase.auth.signInWithOtp(phone: widget.phone);
+      _startTimer();
+      _showSnackBar("تم إعادة إرسال الكود");
+    } catch (e) {
+      _showSnackBar("حدث خطأ أثناء إعادة الإرسال");
+    }
+  }
+
   void _startTimer() {
-    setState(() {
-      _start = 30;
-      _canResend = false;
-    });
+    setState(() { _start = 30; _canResend = false; });
     _timer = Timer.periodic(const Duration(seconds: 1), (timer) {
       if (_start == 0) {
-        setState(() {
-          timer.cancel();
-          _canResend = true;
-        });
+        setState(() { timer.cancel(); _canResend = true; });
       } else {
-        setState(() {
-          _start--;
-        });
+        setState(() { _start--; });
       }
     });
+  }
+
+  void _showSnackBar(String message) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text(message, style: GoogleFonts.cairo())),
+    );
   }
 
   @override
   void dispose() {
     _timer?.cancel();
     _pulseController.dispose();
-    for (var node in _focusNodes) {
-      node.dispose();
-    }
-    for (var controller in _controllers) {
-      controller.dispose();
-    }
+    for (var node in _focusNodes) node.dispose();
+    for (var controller in _controllers) controller.dispose();
     super.dispose();
   }
 
@@ -78,23 +121,22 @@ class _OtpVerificationScreenState extends State<OtpVerificationScreen>
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              const Text(
-                "Verify Phone Number",
-                style: TextStyle(
+              Text(
+                "التحقق من رقم الهاتف",
+                style: GoogleFonts.cairo(
                   fontSize: 24,
                   fontWeight: FontWeight.bold,
-                  color: Color(0xff1C2541),
+                  color: const Color(0xff1C2541),
                 ),
               ),
               const SizedBox(height: 8),
-              const Text(
-                "Enter the code sent to your phone",
+              Text(
+                "أدخل الكود المرسل إلى ${widget.phone}",
                 textAlign: TextAlign.center,
-                style: TextStyle(fontSize: 16, color: Color(0xff8E8E93)),
+                style: GoogleFonts.cairo(fontSize: 14, color: const Color(0xff8E8E93)),
               ),
               const SizedBox(height: 32),
 
-              // مربعات الـ OTP (6 مربعات)
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: List.generate(6, (index) => _buildOtpBox(index)),
@@ -102,17 +144,15 @@ class _OtpVerificationScreenState extends State<OtpVerificationScreen>
 
               const SizedBox(height: 24),
 
-              // الروابط والعد التنازلي
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
                   GestureDetector(
-                    onTap: _canResend ? _startTimer : null,
+                    onTap: _canResend ? _resendCode : null,
                     child: Text(
-                      "Resend Code",
-                      style: TextStyle(
-                        color:
-                            _canResend ? const Color(0xff007AFF) : Colors.grey,
+                      "إعادة إرسال الكود",
+                      style: GoogleFonts.cairo(
+                        color: _canResend ? const Color(0xff007AFF) : Colors.grey,
                         fontWeight: FontWeight.bold,
                       ),
                     ),
@@ -126,36 +166,21 @@ class _OtpVerificationScreenState extends State<OtpVerificationScreen>
 
               const SizedBox(height: 40),
 
-              // زر التحقق مع تأثير النبض
-              ScaleTransition(
+              _isLoading
+              ? const CircularProgressIndicator()
+              : ScaleTransition(
                 scale: Tween(begin: 1.0, end: 1.05).animate(_pulseController),
                 child: ElevatedButton(
-                  onPressed: () {
-                    // الانتقال لشاشة تسجيل البيانات (Elite Onboarding)
-                    Navigator.push(
-                      context,
-                      MaterialPageRoute(
-                        builder: (context) => const OnboardingDetailsScreen(),
-                      ),
-                    );
-                  },
+                  onPressed: _verifyOtp,
                   style: ElevatedButton.styleFrom(
-                    backgroundColor: const Color(0xff007AFF),
+                    backgroundColor: const Color(0xff1C2541), // توحيد اللون الكحلي لـ Elite
                     foregroundColor: Colors.white,
                     minimumSize: const Size(double.infinity, 56),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(30),
-                    ),
-                    elevation: 8,
-                    // تم استبدال withOpacity بـ withValues لتجنب التحذير
-                    shadowColor: const Color(0xff007AFF).withValues(alpha: 0.4),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
                   ),
-                  child: const Text(
-                    "Verify",
-                    style: TextStyle(
-                      fontSize: 18,
-                      fontWeight: FontWeight.bold,
-                    ),
+                  child: Text(
+                    "تحقق الآن",
+                    style: GoogleFonts.cairo(fontSize: 18, fontWeight: FontWeight.bold),
                   ),
                 ),
               ),
@@ -169,14 +194,14 @@ class _OtpVerificationScreenState extends State<OtpVerificationScreen>
   Widget _buildOtpBox(int index) {
     return SizedBox(
       width: 45,
-      height: 50,
+      height: 55,
       child: TextField(
         controller: _controllers[index],
         focusNode: _focusNodes[index],
         keyboardType: TextInputType.number,
         textAlign: TextAlign.center,
         maxLength: 1,
-        style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
+        style: GoogleFonts.poppins(fontSize: 20, fontWeight: FontWeight.bold),
         decoration: InputDecoration(
           counterText: "",
           enabledBorder: OutlineInputBorder(
@@ -185,7 +210,7 @@ class _OtpVerificationScreenState extends State<OtpVerificationScreen>
           ),
           focusedBorder: OutlineInputBorder(
             borderRadius: BorderRadius.circular(12),
-            borderSide: const BorderSide(color: Color(0xff007AFF), width: 2),
+            borderSide: const BorderSide(color: const Color(0xff1C2541), width: 2),
           ),
         ),
         onChanged: (value) {

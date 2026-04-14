@@ -1,12 +1,45 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 
-class WalletScreen extends ConsumerWidget {
+class WalletScreen extends ConsumerStatefulWidget {
   const WalletScreen({super.key});
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<WalletScreen> createState() => _WalletScreenState();
+}
+
+class _WalletScreenState extends ConsumerState<WalletScreen> {
+  final _supabase = Supabase.instance.client;
+
+  // دالة لجلب الرصيد الحقيقي من جدول البروفايل (أو المحفظة)
+  Future<Map<String, dynamic>> _getWalletData() async {
+    final userId = _supabase.auth.currentUser!.id;
+
+    // نفترض وجود جدول باسم 'profiles' يحتوي على عمود 'wallet_balance'
+    final data = await _supabase
+        .from('profiles')
+        .select('wallet_balance')
+        .eq('id', userId)
+        .single();
+
+    // جلب آخر 5 معاملات من جدول 'transactions' (اختياري لو متاح)
+    final transactions = await _supabase
+        .from('transactions')
+        .select()
+        .eq('user_id', userId)
+        .order('created_at', ascending: false)
+        .limit(5);
+
+    return {
+      'balance': data['wallet_balance'] ?? 0.0,
+      'transactions': transactions,
+    };
+  }
+
+  @override
+  Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: const Color(0xffF8FAFF),
       appBar: AppBar(
@@ -16,81 +49,93 @@ class WalletScreen extends ConsumerWidget {
         backgroundColor: Colors.transparent,
         elevation: 0,
         foregroundColor: const Color(0xff1C2541),
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.arrow_forward_ios, size: 20),
-            onPressed: () => Navigator.pop(context),
-          ),
-        ],
-        automaticallyImplyLeading: false,
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back_ios, size: 20),
+          onPressed: () => Navigator.pop(context),
+        ),
       ),
-      body: Directionality(
-        textDirection: TextDirection.rtl,
-        child: SingleChildScrollView(
-          padding: const EdgeInsets.all(20),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              _buildBalanceCard(),
-              const SizedBox(height: 30),
-              Text("طرق الدفع",
-                  style: GoogleFonts.cairo(
-                      fontSize: 18, fontWeight: FontWeight.bold)),
-              const SizedBox(height: 15),
-              _buildPaymentMethod(
-                icon: Icons.payments_rounded,
-                title: "نقداً (كاش)",
-                sub: "الدفع يدوياً للسائق",
-                isSelected: true,
-                onTap: () {},
-              ),
-              _buildPaymentMethod(
-                icon: Icons.credit_card_rounded,
-                title: "**** 4242",
-                sub: "بطاقة فيزا منتهية في 12/26",
-                isSelected: false,
-                onTap: () {},
-              ),
-              const SizedBox(height: 30),
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+      body: FutureBuilder<Map<String, dynamic>>(
+        future: _getWalletData(),
+        builder: (context, snapshot) {
+          // في حالة التحميل أو الخطأ نعرض قيم افتراضية
+          double balance = snapshot.data?['balance']?.toDouble() ?? 0.0;
+          List transactions = snapshot.data?['transactions'] ?? [];
+
+          return Directionality(
+            textDirection: TextDirection.rtl,
+            child: SingleChildScrollView(
+              padding: const EdgeInsets.all(20),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text("آخر المعاملات",
+                  _buildBalanceCard(balance),
+                  const SizedBox(height: 30),
+                  Text("طرق الدفع",
                       style: GoogleFonts.cairo(
                           fontSize: 18, fontWeight: FontWeight.bold)),
-                  TextButton(
-                    onPressed: () {},
-                    child: Text("عرض الكل",
-                        style:
-                            GoogleFonts.cairo(color: const Color(0xff007AFF))),
+                  const SizedBox(height: 15),
+                  _buildPaymentMethod(
+                    icon: Icons.payments_rounded,
+                    title: "نقداً (كاش)",
+                    sub: "الدفع يدوياً للسائق",
+                    isSelected: true,
+                    onTap: () {},
                   ),
+                  _buildPaymentMethod(
+                    icon: Icons.account_balance_wallet_rounded,
+                    title: "رصيد المحفظة",
+                    sub: "الدفع المباشر من التطبيق",
+                    isSelected: false,
+                    onTap: () {},
+                  ),
+                  const SizedBox(height: 30),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Text("آخر المعاملات",
+                          style: GoogleFonts.cairo(
+                              fontSize: 18, fontWeight: FontWeight.bold)),
+                      if (transactions.isNotEmpty)
+                        TextButton(
+                          onPressed: () {},
+                          child: Text("عرض الكل",
+                              style: GoogleFonts.cairo(color: const Color(0xff007AFF))),
+                        ),
+                    ],
+                  ),
+
+                  if (transactions.isEmpty)
+                    Center(child: Text("لا توجد معاملات حالياً", style: GoogleFonts.cairo(color: Colors.grey)))
+                  else
+                    ...transactions.map((tx) => _buildTransactionItem(
+                          tx['title'] ?? "رحلة",
+                          tx['amount'].toString(),
+                          "اليوم", // تحويل tx['created_at'] لاحقاً
+                          tx['amount'] < 0,
+                        )),
                 ],
               ),
-              _buildTransactionItem(
-                  "رحلة إلى مول العرب", "- 120 جـ", "اليوم، 12:30 م", true),
-              _buildTransactionItem(
-                  "شحن المحفظة", "+ 500 جـ", "أمس، 09:00 ص", false),
-            ],
-          ),
-        ),
+            ),
+          );
+        },
       ),
     );
   }
 
-  Widget _buildBalanceCard() {
+  Widget _buildBalanceCard(double balance) {
     return Container(
       width: double.infinity,
       padding: const EdgeInsets.all(25),
       decoration: BoxDecoration(
         gradient: const LinearGradient(
-          colors: [Color(0xff007AFF), Color(0xff0057FF)],
+          colors: [Color(0xff1C2541), Color(0xff3A506B)],
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
         ),
         borderRadius: BorderRadius.circular(25),
         boxShadow: [
           BoxShadow(
-            color: const Color(0xff007AFF).withValues(alpha: 0.3),
+            color: const Color(0xff1C2541).withOpacity(0.3),
             blurRadius: 20,
             offset: const Offset(0, 10),
           )
@@ -102,7 +147,7 @@ class WalletScreen extends ConsumerWidget {
           Text("إجمالي الرصيد الحالي",
               style: GoogleFonts.cairo(color: Colors.white70, fontSize: 14)),
           const SizedBox(height: 5),
-          Text("1,250.00 جـ",
+          Text("${balance.toStringAsFixed(2)} جـ",
               style: GoogleFonts.poppins(
                   fontSize: 32,
                   fontWeight: FontWeight.bold,
@@ -115,10 +160,9 @@ class WalletScreen extends ConsumerWidget {
                 style: GoogleFonts.cairo(fontWeight: FontWeight.bold)),
             style: ElevatedButton.styleFrom(
               backgroundColor: Colors.white,
-              foregroundColor: const Color(0xff007AFF),
+              foregroundColor: const Color(0xff1C2541),
               elevation: 0,
-              shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(12)),
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
               minimumSize: const Size(130, 45),
             ),
           )
@@ -127,6 +171,7 @@ class WalletScreen extends ConsumerWidget {
     );
   }
 
+  // الودجت الفرعية تظل كما هي مع تحسينات طفيفة في الألوان
   Widget _buildPaymentMethod({
     required IconData icon,
     required String title,
@@ -143,13 +188,10 @@ class WalletScreen extends ConsumerWidget {
           color: Colors.white,
           borderRadius: BorderRadius.circular(18),
           border: Border.all(
-              color: isSelected ? const Color(0xff007AFF) : Colors.white,
+              color: isSelected ? const Color(0xff007AFF) : Colors.transparent,
               width: 2),
           boxShadow: [
-            BoxShadow(
-                color: Colors.black.withValues(alpha: 0.03),
-                blurRadius: 10,
-                offset: const Offset(0, 4))
+            BoxShadow(color: Colors.black.withOpacity(0.03), blurRadius: 10)
           ],
         ),
         child: Row(
@@ -165,63 +207,45 @@ class WalletScreen extends ConsumerWidget {
             Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(title,
-                    style: GoogleFonts.cairo(
-                        fontWeight: FontWeight.bold, fontSize: 15)),
-                Text(sub,
-                    style: GoogleFonts.cairo(color: Colors.grey, fontSize: 12)),
+                Text(title, style: GoogleFonts.cairo(fontWeight: FontWeight.bold, fontSize: 15)),
+                Text(sub, style: GoogleFonts.cairo(color: Colors.grey, fontSize: 12)),
               ],
             ),
             const Spacer(),
-            if (isSelected)
-              const Icon(Icons.check_circle, color: Color(0xff007AFF), size: 25)
-            else
-              const Icon(Icons.radio_button_off, color: Colors.grey, size: 25),
+            Icon(isSelected ? Icons.check_circle : Icons.radio_button_off,
+                 color: isSelected ? const Color(0xff007AFF) : Colors.grey),
           ],
         ),
       ),
     );
   }
 
-  Widget _buildTransactionItem(
-      String title, String amount, String date, bool isNegative) {
+  Widget _buildTransactionItem(String title, String amount, String date, bool isNegative) {
     return Container(
       margin: const EdgeInsets.only(bottom: 10),
       padding: const EdgeInsets.symmetric(horizontal: 15, vertical: 12),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(15),
-      ),
+      decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(15)),
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
           Row(
             children: [
               CircleAvatar(
-                backgroundColor: isNegative
-                    ? const Color(0xffFFF0F0)
-                    : const Color(0xffF0FFF4),
-                child: Icon(
-                  isNegative ? Icons.north_east : Icons.south_west,
-                  size: 18,
-                  color: isNegative ? Colors.red : Colors.green,
-                ),
+                backgroundColor: isNegative ? const Color(0xffFFF0F0) : const Color(0xffF0FFF4),
+                child: Icon(isNegative ? Icons.north_east : Icons.south_west,
+                            size: 18, color: isNegative ? Colors.red : Colors.green),
               ),
               const SizedBox(width: 12),
               Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(title,
-                      style: GoogleFonts.cairo(
-                          fontWeight: FontWeight.bold, fontSize: 14)),
-                  Text(date,
-                      style:
-                          GoogleFonts.cairo(fontSize: 11, color: Colors.grey)),
+                  Text(title, style: GoogleFonts.cairo(fontWeight: FontWeight.bold, fontSize: 14)),
+                  Text(date, style: GoogleFonts.cairo(fontSize: 11, color: Colors.grey)),
                 ],
               ),
             ],
           ),
-          Text(amount,
+          Text("${isNegative ? '' : '+'}$amount جـ",
               style: GoogleFonts.poppins(
                   fontWeight: FontWeight.bold,
                   fontSize: 15,

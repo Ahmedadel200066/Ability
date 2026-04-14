@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'dart:ui';
-import 'otp_verification_screen.dart'; // تأكد من وجود هذا الملف في مشروعك
+import 'package:supabase_flutter/supabase_flutter.dart'; // إضافة سوبابيز
+import 'otp_verification_screen.dart';
 
 class ProfileSetupScreen extends StatefulWidget {
   const ProfileSetupScreen({super.key});
@@ -10,12 +11,14 @@ class ProfileSetupScreen extends StatefulWidget {
 }
 
 class _ProfileSetupScreenState extends State<ProfileSetupScreen> {
+  final _supabase = Supabase.instance.client;
   final TextEditingController _nameController = TextEditingController();
   final TextEditingController _phoneController = TextEditingController();
   final TextEditingController _emailController = TextEditingController();
 
   double _progress = 0.0;
   bool _isBtnActive = false;
+  bool _isLoading = false; // لمؤشر التحميل
 
   void _validate() {
     int filledFields = 0;
@@ -26,7 +29,6 @@ class _ProfileSetupScreenState extends State<ProfileSetupScreen> {
     setState(() {
       _progress = filledFields / 3;
 
-      // التحقق من صحة البريد الإلكتروني
       bool isEmailValid = RegExp(
         r"^[a-zA-Z0-9.a-zA-Z0-9.!#$%&'*+-/=?^_`{|}~]+@[a-zA-Z0-9]+\.[a-zA-Z]+",
       ).hasMatch(_emailController.text);
@@ -35,6 +37,42 @@ class _ProfileSetupScreenState extends State<ProfileSetupScreen> {
           _phoneController.text.length >= 10 &&
           isEmailValid;
     });
+  }
+
+  // الدالة الأساسية لإرسال الـ OTP والتحضير للبيانات
+  Future<void> _handleContinue() async {
+    setState(() => _isLoading = true);
+
+    try {
+      final phone = _phoneController.text.trim();
+
+      // 1. إرسال كود التحقق عبر سوبابيز
+      await _supabase.auth.signInWithOtp(
+        phone: phone,
+      );
+
+      if (mounted) {
+        // ننتقل لشاشة OTP ونمرر البيانات اللي السواق كتبها عشان نحفظها بعد التحقق
+        Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (context) => OtpVerificationScreen(
+              phone: phone,
+              tempData: {
+                'full_name': _nameController.text.trim(),
+                'email': _emailController.text.trim(),
+              },
+            ),
+          ),
+        );
+      }
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text("خطأ في إرسال الكود: $e")),
+      );
+    } finally {
+      if (mounted) setState(() => _isLoading = false);
+    }
   }
 
   @override
@@ -52,7 +90,6 @@ class _ProfileSetupScreenState extends State<ProfileSetupScreen> {
         ),
         child: Stack(
           children: [
-            // Blobs خلفية ملونة مع التحديث الجديد للألوان
             _buildBlob(Alignment.topLeft, const Color(0xff0A84FF)),
             _buildBlob(Alignment.bottomRight, const Color(0xff30D158)),
 
@@ -64,16 +101,11 @@ class _ProfileSetupScreenState extends State<ProfileSetupScreen> {
                     filter: ImageFilter.blur(sigmaX: 40, sigmaY: 40),
                     child: Container(
                       width: MediaQuery.of(context).size.width * 0.9,
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 25,
-                        vertical: 40,
-                      ),
+                      padding: const EdgeInsets.symmetric(horizontal: 25, vertical: 40),
                       decoration: BoxDecoration(
-                        color: Colors.white.withValues(alpha: 0.2),
+                        color: Colors.white.withOpacity(0.2),
                         borderRadius: BorderRadius.circular(40),
-                        border: Border.all(
-                          color: Colors.white.withValues(alpha: 0.4),
-                        ),
+                        border: Border.all(color: Colors.white.withOpacity(0.4)),
                       ),
                       child: Column(
                         mainAxisSize: MainAxisSize.min,
@@ -81,15 +113,9 @@ class _ProfileSetupScreenState extends State<ProfileSetupScreen> {
                         children: [
                           const Text(
                             "Set Up Profile",
-                            style: TextStyle(
-                              color: Colors.white,
-                              fontSize: 28,
-                              fontWeight: FontWeight.bold,
-                            ),
+                            style: TextStyle(color: Colors.white, fontSize: 28, fontWeight: FontWeight.bold),
                           ),
                           const SizedBox(height: 20),
-
-                          // شريط التقدم
                           LinearProgressIndicator(
                             value: _progress,
                             backgroundColor: Colors.white24,
@@ -98,30 +124,12 @@ class _ProfileSetupScreenState extends State<ProfileSetupScreen> {
                             borderRadius: BorderRadius.circular(10),
                           ),
                           const SizedBox(height: 35),
-
-                          _buildGlassInput(
-                            _nameController,
-                            "Full Name",
-                            Icons.person,
-                          ),
-                          _buildGlassInput(
-                            _phoneController,
-                            "Phone Number",
-                            Icons.phone,
-                            isPhone: true,
-                          ),
-                          _buildGlassInput(
-                            _emailController,
-                            "Email Address",
-                            Icons.email,
-                          ),
-
+                          _buildGlassInput(_nameController, "Full Name", Icons.person),
+                          _buildGlassInput(_phoneController, "Phone Number", Icons.phone, isPhone: true),
+                          _buildGlassInput(_emailController, "Email Address", Icons.email),
                           const SizedBox(height: 10),
-
-                          // وسيلة الدفع (Cash)
                           _buildPaymentTile(),
-
-                          const SizedBox(height: 120), // مساحة للزر الثابت
+                          const SizedBox(height: 120),
                         ],
                       ),
                     ),
@@ -130,14 +138,45 @@ class _ProfileSetupScreenState extends State<ProfileSetupScreen> {
               ),
             ),
 
-            // الزر الثابت في الأسفل
             Positioned(
-              bottom: 40,
-              left: 40,
-              right: 40,
-              child: _buildContinueButton(),
+              bottom: 40, left: 40, right: 40,
+              child: _isLoading
+                ? const Center(child: CircularProgressIndicator(color: Colors.white))
+                : _buildContinueButton(),
             ),
           ],
+        ),
+      ),
+    );
+  }
+
+  // الدوال المساعدة ( _buildBlob, _buildGlassInput, _buildPaymentTile) تظل كما هي في كودك الأصلي
+
+  Widget _buildContinueButton() {
+    return SizedBox(
+      height: 60,
+      child: ElevatedButton(
+        onPressed: _isBtnActive ? _handleContinue : null,
+        style: ElevatedButton.styleFrom(
+          backgroundColor: Colors.transparent,
+          shadowColor: Colors.transparent,
+          padding: EdgeInsets.zero,
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(25)),
+        ),
+        child: Ink(
+          decoration: BoxDecoration(
+            gradient: _isBtnActive
+                ? const LinearGradient(colors: [Color(0xff0A84FF), Color(0xff30D158)])
+                : LinearGradient(colors: [Colors.white.withOpacity(0.1), Colors.white.withOpacity(0.1)]),
+            borderRadius: BorderRadius.circular(25),
+          ),
+          child: Container(
+            alignment: Alignment.center,
+            child: const Text(
+              "Continue",
+              style: TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold),
+            ),
+          ),
         ),
       ),
     );
@@ -151,7 +190,7 @@ class _ProfileSetupScreenState extends State<ProfileSetupScreen> {
         height: 300,
         decoration: BoxDecoration(
           shape: BoxShape.circle,
-          color: color.withValues(alpha: 0.3),
+          color: color.withOpacity(0.3),
         ),
         child: BackdropFilter(
           filter: ImageFilter.blur(sigmaX: 120, sigmaY: 120),
@@ -161,12 +200,7 @@ class _ProfileSetupScreenState extends State<ProfileSetupScreen> {
     );
   }
 
-  Widget _buildGlassInput(
-    TextEditingController controller,
-    String label,
-    IconData icon, {
-    bool isPhone = false,
-  }) {
+  Widget _buildGlassInput(TextEditingController controller, String label, IconData icon, {bool isPhone = false}) {
     return Container(
       margin: const EdgeInsets.only(bottom: 25),
       child: TextField(
@@ -178,113 +212,10 @@ class _ProfileSetupScreenState extends State<ProfileSetupScreen> {
           labelText: label,
           labelStyle: const TextStyle(color: Colors.black54),
           filled: true,
-          fillColor: Colors.white.withValues(alpha: 0.8),
+          fillColor: Colors.white.withOpacity(0.8),
           prefixIcon: Icon(icon, color: Colors.black45),
-          border: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(20),
-            borderSide: BorderSide.none,
-          ),
-          focusedBorder: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(20),
-            borderSide: const BorderSide(color: Colors.white, width: 2),
-          ),
-        ),
-      ),
-    );
-  }
-
-  Widget _buildPaymentTile() {
-    return Container(
-      padding: const EdgeInsets.all(18),
-      decoration: BoxDecoration(
-        color: Colors.white.withValues(alpha: 0.85),
-        borderRadius: BorderRadius.circular(24),
-      ),
-      child: Row(
-        children: [
-          Container(
-            padding: const EdgeInsets.all(10),
-            decoration: BoxDecoration(
-              color: const Color(0xff30D158),
-              borderRadius: BorderRadius.circular(14),
-            ),
-            child: const Text("💵", style: TextStyle(fontSize: 20)),
-          ),
-          const SizedBox(width: 12),
-          const Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  "Cash",
-                  style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
-                ),
-                Text(
-                  "Payment Method",
-                  style: TextStyle(color: Colors.grey, fontSize: 12),
-                ),
-              ],
-            ),
-          ),
-          const Text(
-            "Selected",
-            style: TextStyle(
-              color: Color(0xff0A84FF),
-              fontWeight: FontWeight.bold,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildContinueButton() {
-    return SizedBox(
-      height: 60,
-      child: ElevatedButton(
-        onPressed: _isBtnActive
-            ? () {
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(
-                    builder: (context) => const OtpVerificationScreen(),
-                  ),
-                );
-              }
-            : null,
-        style: ElevatedButton.styleFrom(
-          backgroundColor: Colors.transparent,
-          shadowColor: Colors.transparent,
-          padding: EdgeInsets.zero,
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(25),
-          ),
-        ),
-        child: Ink(
-          decoration: BoxDecoration(
-            gradient: _isBtnActive
-                ? const LinearGradient(
-                    colors: [Color(0xff0A84FF), Color(0xff30D158)],
-                  )
-                : LinearGradient(
-                    colors: [
-                      Colors.white.withValues(alpha: 0.1),
-                      Colors.white.withValues(alpha: 0.1),
-                    ],
-                  ),
-            borderRadius: BorderRadius.circular(25),
-          ),
-          child: Container(
-            alignment: Alignment.center,
-            child: const Text(
-              "Continue",
-              style: TextStyle(
-                color: Colors.white,
-                fontSize: 18,
-                fontWeight: FontWeight.bold,
-              ),
-            ),
-          ),
+          border: OutlineInputBorder(borderRadius: BorderRadius.circular(20), borderSide: BorderSide.none),
+          focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(20), borderSide: const BorderSide(color: Colors.white, width: 2)),
         ),
       ),
     );

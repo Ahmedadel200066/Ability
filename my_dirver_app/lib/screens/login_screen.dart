@@ -1,179 +1,86 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_fonts/google_fonts.dart';
-import '../services/auth_provider.dart';
+import 'package:flutter_localizations/flutter_localizations.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 
-class LoginScreen extends ConsumerStatefulWidget {
-  const LoginScreen({super.key});
+// استيراد البروفايدر اللي عملناه
+import 'package:my_driver_app/providers/auth_provider.dart';
 
-  @override
-  ConsumerState<LoginScreen> createState() => _LoginScreenState();
+import 'package:my_driver_app/screens/login_screen.dart';
+import 'package:my_driver_app/screens/shared/signup_screen.dart';
+import 'package:my_driver_app/screens/rider/rider_home_screen.dart';
+import 'package:my_driver_app/screens/rider/trip_completed_screen.dart';
+import 'package:my_driver_app/screens/shared/profile_screen.dart';
+import 'package:my_driver_app/screens/rider/wallet_screen.dart';
+
+void main() async {
+  WidgetsFlutterBinding.ensureInitialized();
+
+  await Supabase.initialize(
+    url: 'https://njsxgrexdgekelxwgang.supabase.co',
+    anonKey: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im5qc3hncmV4ZGdla2VseHdnYW5nIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzYwOTg2MDAsImV4cCI6MjA5MTY3NDYwMH0.KWCjNDh0PKkc6s-4obLr6TRSW9Lm33zz_PDearf6XBU',
+  );
+
+  runApp(
+    const ProviderScope(child: EliteApp()),
+  );
 }
 
-class _LoginScreenState extends ConsumerState<LoginScreen> {
-  final phoneController = TextEditingController();
-  final passwordController = TextEditingController();
+class EliteApp extends ConsumerWidget {
+  const EliteApp({super.key});
 
   @override
-  Widget build(BuildContext context) {
-    // مراقبة حالة الدخول
+  Widget build(BuildContext context, WidgetRef ref) {
+    // مراقبة حالة المصادقة من الـ authProvider
     final authState = ref.watch(authProvider);
 
-    // الاستماع للتغييرات (إظهار خطأ أو انتقال لشاشة أخرى)
-    ref.listen(authProvider, (previous, next) {
-      next.whenOrNull(
-        error: (e, _) => ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(e.toString()), backgroundColor: Colors.red),
+    return MaterialApp(
+      title: 'Elite Rider',
+      debugShowCheckedModeBanner: false,
+      locale: const Locale('ar', 'EG'),
+      supportedLocales: const [Locale('ar', 'EG')],
+      localizationsDelegates: const [
+        GlobalMaterialLocalizations.delegate,
+        GlobalWidgetsLocalizations.delegate,
+        GlobalCupertinoLocalizations.delegate,
+      ],
+      theme: ThemeData(
+        useMaterial3: true,
+        primaryColor: const Color(0xff007AFF),
+        scaffoldBackgroundColor: Colors.white,
+        textTheme: GoogleFonts.cairoTextTheme(Theme.of(context).textTheme),
+        colorScheme: ColorScheme.fromSeed(
+          seedColor: const Color(0xff007AFF),
+          primary: const Color(0xff007AFF),
+          secondary: const Color(0xff1C2541),
+          surface: Colors.white,
         ),
-        data: (token) {
-          if (token != null) Navigator.pushReplacementNamed(context, '/home');
+      ),
+      // هنا الـ Logic الاحترافي لتحديد أول شاشة تظهر
+      home: authState.when(
+        data: (session) {
+          if (session != null) {
+            return const RiderHomeScreen(); // لو مسجل دخول يفتح الهوم
+          } else {
+            return const SignupScreen(); // لو مش مسجل يفتح الساين أب
+          }
         },
-      );
-    });
-
-    return Scaffold(
-      backgroundColor: Colors.white,
-      body: SingleChildScrollView(
-        child: Column(
-          children: [
-            _buildHeader(),
-            Padding(
-              padding: const EdgeInsets.all(30),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.end,
-                children: [
-                  Text(
-                    "تسجيل الدخول",
-                    style: GoogleFonts.cairo(
-                      fontSize: 28,
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
-                  const SizedBox(height: 10),
-                  Text(
-                    "أهلاً بك مجدداً في تطبيق إيليت",
-                    style: GoogleFonts.cairo(color: Colors.grey),
-                  ),
-                  const SizedBox(height: 40),
-
-                  _buildTextField(
-                    phoneController,
-                    "رقم الهاتف",
-                    Icons.phone_android_outlined,
-                  ),
-                  const SizedBox(height: 20),
-                  _buildTextField(
-                    passwordController,
-                    "كلمة المرور",
-                    Icons.lock_outline,
-                    isPassword: true,
-                  ),
-
-                  const SizedBox(height: 15),
-                  Text(
-                    "نسيت كلمة المرور؟",
-                    style: GoogleFonts.cairo(
-                      color: const Color(0xff007AFF),
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
-                  const SizedBox(height: 40),
-
-                  _buildLoginButton(authState.isLoading),
-
-                  const SizedBox(height: 30),
-                  Center(
-                    child: RichText(
-                      text: TextSpan(
-                        style: GoogleFonts.cairo(
-                          color: Colors.black,
-                          fontSize: 14,
-                        ),
-                        children: [
-                          const TextSpan(text: "ليس لديك حساب؟ "),
-                          TextSpan(
-                            text: "سجل الآن",
-                            style: GoogleFonts.cairo(
-                              color: const Color(0xff007AFF),
-                              fontWeight: FontWeight.bold,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ],
+        loading: () => const Scaffold(
+          body: Center(child: CircularProgressIndicator()),
+        ),
+        error: (err, stack) => Scaffold(
+          body: Center(child: Text("حدث خطأ في الاتصال: $err")),
         ),
       ),
-    );
-  }
-
-  Widget _buildHeader() {
-    return Container(
-      height: 250,
-      width: double.infinity,
-      decoration: const BoxDecoration(
-        gradient: LinearGradient(
-          colors: [Color(0xff007AFF), Color(0xff0057FF)],
-        ),
-        borderRadius: BorderRadius.only(bottomLeft: Radius.circular(80)),
-      ),
-      child: const Center(
-        child: Icon(Icons.directions_car_filled, size: 80, color: Colors.white),
-      ),
-    );
-  }
-
-  Widget _buildTextField(
-    TextEditingController controller,
-    String label,
-    IconData icon, {
-    bool isPassword = false,
-  }) {
-    return TextField(
-      controller: controller,
-      obscureText: isPassword,
-      textAlign: TextAlign.right,
-      decoration: InputDecoration(
-        labelText: label,
-        prefixIcon: Icon(icon, color: const Color(0xff007AFF)),
-        labelStyle: GoogleFonts.cairo(),
-        border: OutlineInputBorder(borderRadius: BorderRadius.circular(15)),
-        enabledBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(15),
-          borderSide: BorderSide(color: Colors.grey[200]!),
-        ),
-      ),
-    );
-  }
-
-  Widget _buildLoginButton(bool isLoading) {
-    return ElevatedButton(
-      onPressed: isLoading
-          ? null
-          : () {
-              ref
-                  .read(authProvider.notifier)
-                  .login(phoneController.text, passwordController.text);
-            },
-      style: ElevatedButton.styleFrom(
-        backgroundColor: const Color(0xff007AFF),
-        minimumSize: const Size(double.infinity, 60),
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
-      ),
-      child: isLoading
-          ? const CircularProgressIndicator(color: Colors.white)
-          : Text(
-              "دخول",
-              style: GoogleFonts.cairo(
-                fontSize: 18,
-                fontWeight: FontWeight.bold,
-                color: Colors.white,
-              ),
-            ),
+      routes: {
+        '/signup': (context) => const SignupScreen(),
+        '/login': (context) => const LoginScreen(),
+        '/home': (context) => const RiderHomeScreen(),
+        '/profile': (context) => const ProfileScreen(),
+        '/wallet': (context) => const WalletScreen(),
+        '/trip_completed': (context) => const TripCompletedScreen(),
+      },
     );
   }
 }

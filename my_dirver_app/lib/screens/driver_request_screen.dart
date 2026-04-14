@@ -1,8 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:google_fonts/google_fonts.dart';
 
 class DriverRequestScreen extends StatefulWidget {
-  const DriverRequestScreen({super.key});
+  final Map<String, dynamic> tripData; // استقبال بيانات الرحلة القادمة
+
+  const DriverRequestScreen({super.key, required this.tripData});
 
   @override
   State<DriverRequestScreen> createState() => _DriverRequestScreenState();
@@ -10,16 +14,21 @@ class DriverRequestScreen extends StatefulWidget {
 
 class _DriverRequestScreenState extends State<DriverRequestScreen> {
   GoogleMapController? _mapController;
+  final _supabase = Supabase.instance.client;
+  bool _isProcessing = false;
 
   final Set<Marker> _markers = {};
   final Set<Polyline> _polylines = {};
 
+  // مواقع افتراضية (يفضل جلب موقع السائق الفعلي من الـ Location Service)
   final LatLng _driverPos = const LatLng(30.0444, 31.2357);
-  final LatLng _pickupPos = const LatLng(30.0500, 31.2333);
+  late LatLng _pickupPos;
 
   @override
   void initState() {
     super.initState();
+    // تحويل إحداثيات الراكب من البيانات القادمة
+    _pickupPos = const LatLng(30.0500, 31.2333); // مثال، استبدليها بـ widget.tripData['lat/lng']
     _setMapItems();
   }
 
@@ -49,23 +58,42 @@ class _DriverRequestScreenState extends State<DriverRequestScreen> {
     );
   }
 
-  // دالة تحريك الكاميرا لتشمل النقطتين معاً
+  // قبول الرحلة وتحديث الحالة في سوبابيز
+  Future<void> _acceptRide() async {
+    setState(() => _isProcessing = true);
+    try {
+      final driverId = _supabase.auth.currentUser!.id;
+
+      await _supabase.from('rides').update({
+        'status': 'accepted',
+        'driver_id': driverId,
+      }).eq('id', widget.tripData['id']);
+
+      if (mounted) {
+        // الانتقال لشاشة التوجه للراكب
+        Navigator.pop(context, true);
+      }
+    } catch (e) {
+      debugPrint("Error accepting ride: $e");
+    } finally {
+      if (mounted) setState(() => _isProcessing = false);
+    }
+  }
+
+  // رفض الرحلة (إغلاق الشاشة فقط)
+  void _declineRide() {
+    Navigator.pop(context);
+  }
+
   void _fitPoints() {
     if (_mapController == null) return;
-
     LatLngBounds bounds;
     if (_driverPos.latitude > _pickupPos.latitude) {
       bounds = LatLngBounds(southwest: _pickupPos, northeast: _driverPos);
     } else {
       bounds = LatLngBounds(southwest: _driverPos, northeast: _pickupPos);
     }
-
     _mapController!.animateCamera(CameraUpdate.newLatLngBounds(bounds, 70));
-  }
-
-  String _calculateFare(double distanceInKm) {
-    double fare = 15 + (distanceInKm * 8);
-    return fare.toStringAsFixed(2);
   }
 
   @override
@@ -79,9 +107,9 @@ class _DriverRequestScreenState extends State<DriverRequestScreen> {
             polylines: _polylines,
             onMapCreated: (controller) {
               _mapController = controller;
-              _fitPoints(); // استخدام المتغير هنا يحل مشكلة الـ "Unused field"
+              _fitPoints();
             },
-            style: _mapDarkStyle,
+            zoomControlsEnabled: false,
           ),
           Positioned(
             bottom: 0,
@@ -98,15 +126,8 @@ class _DriverRequestScreenState extends State<DriverRequestScreen> {
     return Container(
       padding: const EdgeInsets.all(25),
       decoration: BoxDecoration(
-        color: const Color(0xff1c1c1e).withValues(alpha: 0.95),
+        color: const Color(0xff1c1c1e).withOpacity(0.95),
         borderRadius: const BorderRadius.vertical(top: Radius.circular(30)),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: 0.3),
-            blurRadius: 20,
-            offset: const Offset(0, -5),
-          )
-        ],
       ),
       child: Column(
         mainAxisSize: MainAxisSize.min,
@@ -115,26 +136,25 @@ class _DriverRequestScreenState extends State<DriverRequestScreen> {
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              const Column(
+              Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text("Ahmed Ali",
-                      style: TextStyle(
+                  Text(widget.tripData['rider_name'] ?? "الراكب",
+                      style: GoogleFonts.cairo(
                           color: Colors.white,
-                          fontSize: 24,
+                          fontSize: 22,
                           fontWeight: FontWeight.bold)),
-                  Text("⭐ 4.9",
+                  const Text("⭐ 4.9",
                       style: TextStyle(color: Color(0xff34C759), fontSize: 16)),
                 ],
               ),
               Container(
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 15, vertical: 8),
+                padding: const EdgeInsets.symmetric(horizontal: 15, vertical: 8),
                 decoration: BoxDecoration(
-                  color: const Color(0xff34C759).withValues(alpha: 0.1),
+                  color: const Color(0xff34C759).withOpacity(0.1),
                   borderRadius: BorderRadius.circular(10),
                 ),
-                child: Text("EGP ${_calculateFare(2.5)}",
+                child: Text("EGP ${widget.tripData['price']}",
                     style: const TextStyle(
                         color: Color(0xff34C759),
                         fontSize: 20,
@@ -143,24 +163,25 @@ class _DriverRequestScreenState extends State<DriverRequestScreen> {
             ],
           ),
           const SizedBox(height: 20),
-          const Row(
+          Row(
             children: [
-              Icon(Icons.location_on, color: Colors.white70, size: 20),
-              SizedBox(width: 8),
-              Text("Pickup: Downtown Cairo",
-                  style: TextStyle(color: Colors.white70, fontSize: 16)),
+              const Icon(Icons.location_on, color: Colors.white70, size: 20),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Text("من: ${widget.tripData['pickup_address']}",
+                    style: GoogleFonts.cairo(color: Colors.white70, fontSize: 14),
+                    overflow: TextOverflow.ellipsis),
+              ),
             ],
           ),
           const Divider(color: Colors.white12, height: 40),
-          Row(
+          _isProcessing
+          ? const Center(child: CircularProgressIndicator(color: Color(0xff34C759)))
+          : Row(
             children: [
-              Expanded(
-                  child:
-                      _actionButton("Decline", const Color(0xffFF3B30), () {})),
+              Expanded(child: _actionButton("رفض", const Color(0xffFF3B30), _declineRide)),
               const SizedBox(width: 15),
-              Expanded(
-                  child:
-                      _actionButton("Accept", const Color(0xff34C759), () {})),
+              Expanded(child: _actionButton("قبول", const Color(0xff34C759), _acceptRide)),
             ],
           ),
         ],
@@ -174,15 +195,11 @@ class _DriverRequestScreenState extends State<DriverRequestScreen> {
       style: ElevatedButton.styleFrom(
         backgroundColor: color,
         foregroundColor: Colors.white,
-        padding: const EdgeInsets.symmetric(vertical: 18),
+        padding: const EdgeInsets.symmetric(vertical: 15),
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
         elevation: 0,
       ),
-      child: Text(label,
-          style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+      child: Text(label, style: GoogleFonts.cairo(fontSize: 18, fontWeight: FontWeight.bold)),
     );
   }
 }
-
-const String _mapDarkStyle =
-    '[]'; // اتركها فارغة مؤقتاً لتجنب أي أخطاء في الـ JSON

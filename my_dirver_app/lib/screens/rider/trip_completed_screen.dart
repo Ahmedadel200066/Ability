@@ -4,9 +4,13 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
 import 'package:confetti/confetti.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:supabase_flutter/supabase_flutter.dart'; // إضافة سوبابيز
 
 class TripCompletedScreen extends ConsumerStatefulWidget {
-  const TripCompletedScreen({super.key});
+  final String? tripId; // استقبال رقم الرحلة
+  final double? fare;   // استقبال الأجرة الحقيقية
+
+  const TripCompletedScreen({super.key, this.tripId, this.fare});
 
   @override
   ConsumerState<TripCompletedScreen> createState() =>
@@ -17,6 +21,8 @@ class _TripCompletedScreenState extends ConsumerState<TripCompletedScreen> {
   int selectedRating = 0;
   final commentController = TextEditingController();
   late ConfettiController _confettiController;
+  final _supabase = Supabase.instance.client;
+  bool _isSubmitting = false;
 
   @override
   void initState() {
@@ -32,16 +38,36 @@ class _TripCompletedScreenState extends ConsumerState<TripCompletedScreen> {
     super.dispose();
   }
 
+  // دالة إرسال التقييم لـ Supabase
   void submit() async {
-    if (selectedRating == 0) return;
+    if (selectedRating == 0 || _isSubmitting) return;
 
-    _confettiController.play();
+    setState(() => _isSubmitting = true);
 
-    await Future.delayed(const Duration(seconds: 2));
+    try {
+      // تحديث التقييم والتعليق في جدول rides
+      if (widget.tripId != null) {
+        await _supabase.from('rides').update({
+          'rating': selectedRating,
+          'comment': commentController.text,
+        }).eq('id', widget.tripId!);
+      }
 
-    if (!mounted) return;
+      _confettiController.play();
 
-    Navigator.pushNamedAndRemoveUntil(context, '/', (route) => false);
+      await Future.delayed(const Duration(seconds: 2));
+
+      if (!mounted) return;
+
+      // العودة للشاشة الرئيسية وحذف كل الشاشات السابقة من الـ Stack
+      Navigator.pushNamedAndRemoveUntil(context, '/', (route) => false);
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text("فشل حفظ التقييم: $e")),
+      );
+    } finally {
+      if (mounted) setState(() => _isSubmitting = false);
+    }
   }
 
   @override
@@ -86,7 +112,8 @@ class _TripCompletedScreenState extends ConsumerState<TripCompletedScreen> {
                     Text("إجمالي الأجرة",
                         textAlign: TextAlign.center,
                         style: GoogleFonts.cairo(fontSize: 14)),
-                    Text("120.50 جـ",
+                    // عرض السعر الحقيقي الممرر للشاشة
+                    Text("${widget.fare ?? '0.0'} جـ",
                         textAlign: TextAlign.center,
                         style: GoogleFonts.poppins(
                             fontSize: 40,
@@ -113,7 +140,7 @@ class _TripCompletedScreenState extends ConsumerState<TripCompletedScreen> {
                       controller: commentController,
                       textAlign: TextAlign.right,
                       decoration: InputDecoration(
-                          hintText: "أضف تعليقاً...",
+                          hintText: "أضف تعليقاً عن الرحلة...",
                           filled: true,
                           fillColor: Colors.grey[100],
                           border: OutlineInputBorder(
@@ -121,18 +148,20 @@ class _TripCompletedScreenState extends ConsumerState<TripCompletedScreen> {
                               borderSide: BorderSide.none)),
                     ),
                     const SizedBox(height: 30),
-                    ElevatedButton(
-                      onPressed: submit,
-                      style: ElevatedButton.styleFrom(
-                          backgroundColor: Colors.blue,
-                          minimumSize: const Size(double.infinity, 60),
-                          shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(15))),
-                      child: Text("تأكيد التقييم",
-                          style: GoogleFonts.cairo(
-                              color: Colors.white,
-                              fontWeight: FontWeight.bold)),
-                    ),
+                    _isSubmitting
+                        ? const Center(child: CircularProgressIndicator())
+                        : ElevatedButton(
+                            onPressed: submit,
+                            style: ElevatedButton.styleFrom(
+                                backgroundColor: const Color(0xff1C2541),
+                                minimumSize: const Size(double.infinity, 60),
+                                shape: RoundedRectangleBorder(
+                                    borderRadius: BorderRadius.circular(15))),
+                            child: Text("تأكيد التقييم",
+                                style: GoogleFonts.cairo(
+                                    color: Colors.white,
+                                    fontWeight: FontWeight.bold)),
+                          ),
                   ],
                 ),
               );
@@ -143,6 +172,7 @@ class _TripCompletedScreenState extends ConsumerState<TripCompletedScreen> {
             child: ConfettiWidget(
               confettiController: _confettiController,
               blastDirection: pi / 2,
+              colors: const [Colors.blue, Colors.green, Colors.orange, Colors.pink],
             ),
           ),
         ],

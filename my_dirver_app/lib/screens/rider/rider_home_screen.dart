@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
 import 'package:geolocator/geolocator.dart';
-import 'package:my_driver_app/presentation/services/api_service.dart';
+import 'package:supabase_flutter/supabase_flutter.dart'; // استيراد سوبابيز
 import '../ride_tracking_screen.dart';
 
 class RiderHomeScreen extends StatefulWidget {
@@ -18,6 +18,9 @@ class _RiderHomeScreenState extends State<RiderHomeScreen> {
   bool _isDestinationSelected = false;
   String _destinationText = "Where to?";
   bool _isSearching = false;
+
+  // الوصول لعميل سوبابيز
+  final _supabase = Supabase.instance.client;
 
   @override
   void initState() {
@@ -37,18 +40,63 @@ class _RiderHomeScreenState extends State<RiderHomeScreen> {
   }
 
   Future<void> _getCurrentLocation() async {
-    Position position = await Geolocator.getCurrentPosition(
-        desiredAccuracy: LocationAccuracy.high);
+    try {
+      Position position = await Geolocator.getCurrentPosition(
+          desiredAccuracy: LocationAccuracy.high);
 
-    if (!mounted) return;
+      if (!mounted) return;
 
-    setState(() {
-      _currentPosition = LatLng(position.latitude, position.longitude);
-    });
+      setState(() {
+        _currentPosition = LatLng(position.latitude, position.longitude);
+      });
 
-    _mapController?.animateCamera(
-      CameraUpdate.newLatLngZoom(_currentPosition, 15),
-    );
+      _mapController?.animateCamera(
+        CameraUpdate.newLatLngZoom(_currentPosition, 15),
+      );
+    } catch (e) {
+      debugPrint("خطأ في تحديد الموقع: $e");
+    }
+  }
+
+  // --- دالة إرسال الطلب المعدلة لتعمل مع Supabase ---
+  void _sendRideRequest() async {
+    final user = _supabase.auth.currentUser;
+    if (user == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text("يجب تسجيل الدخول أولاً")),
+      );
+      return;
+    }
+
+    setState(() => _isSearching = true);
+
+    try {
+      // إرسال طلب الرحلة لجدول يسمى 'rides' في سوبابيز
+      await _supabase.from('rides').insert({
+        'rider_id': user.id, // معرف المستخدم الحقيقي
+        'pickup_lat': _currentPosition.latitude,
+        'pickup_lng': _currentPosition.longitude,
+        'destination_name': _destinationText,
+        'status': 'searching',
+        'ride_type': _selectedCard == 0 ? 'Economy' : 'Luxury',
+        'created_at': DateTime.now().toIso8601String(),
+      });
+
+      if (!mounted) return;
+      setState(() => _isSearching = false);
+
+      // الانتقال لشاشة التتبع بعد نجاح الطلب
+      Navigator.push(
+        context,
+        MaterialPageRoute(builder: (context) => const RideTrackingScreen()),
+      );
+    } catch (e) {
+      if (!mounted) return;
+      setState(() => _isSearching = false);
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text("حدث خطأ في طلب الرحلة: $e")),
+      );
+    }
   }
 
   void _confirmDestination(String dest) {
@@ -59,41 +107,7 @@ class _RiderHomeScreenState extends State<RiderHomeScreen> {
     Navigator.pop(context);
   }
 
-  void _sendRideRequest() async {
-    setState(() => _isSearching = true);
-
-    try {
-      var result = await ApiService.requestRide(
-        riderId: 2,
-        pLat: _currentPosition.latitude,
-        pLng: _currentPosition.longitude,
-        dLat: 30.0600,
-        dLng: 31.2400,
-      );
-
-      if (!mounted) return;
-
-      setState(() => _isSearching = false);
-
-      if (result['status'] == 'success') {
-        Navigator.push(
-          context,
-          MaterialPageRoute(builder: (context) => const RideTrackingScreen()),
-        );
-      } else {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-              content: Text(result['message'] ?? "No drivers found nearby")),
-        );
-      }
-    } catch (e) {
-      if (!mounted) return;
-      setState(() => _isSearching = false);
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text("حدث خطأ في الاتصال")),
-      );
-    }
-  }
+  // --- بقية دوال الـ UI (تبقى كما هي مع تحسينات طفيفة) ---
 
   void _showSearchModal() {
     showModalBottomSheet(
@@ -111,8 +125,9 @@ class _RiderHomeScreenState extends State<RiderHomeScreen> {
           children: [
             TextField(
               autofocus: true,
+              textAlign: TextAlign.right,
               decoration: InputDecoration(
-                hintText: "Enter destination",
+                hintText: "إلى أين؟",
                 prefixIcon: const Icon(Icons.location_on, color: Colors.red),
                 filled: true,
                 fillColor: Colors.grey[100],
@@ -120,13 +135,15 @@ class _RiderHomeScreenState extends State<RiderHomeScreen> {
                     borderRadius: BorderRadius.circular(15),
                     borderSide: BorderSide.none),
               ),
-              onSubmitted: (val) => _confirmDestination(val),
+              onSubmitted: (val) {
+                if(val.isNotEmpty) _confirmDestination(val);
+              },
             ),
             const SizedBox(height: 20),
-            _buildResultItem("Mall of Arabia", "6th of October City",
-                () => _confirmDestination("Mall of Arabia")),
-            _buildResultItem("Cairo Festival City", "New Cairo",
-                () => _confirmDestination("Cairo Festival City")),
+            _buildResultItem("مول العرب", "مدينة 6 أكتوبر",
+                () => _confirmDestination("مول العرب")),
+            _buildResultItem("كايرو فيستيفال سيتي", "التجمع الخامس",
+                () => _confirmDestination("كايرو فيستيفال سيتي")),
           ],
         ),
       ),
@@ -145,7 +162,9 @@ class _RiderHomeScreenState extends State<RiderHomeScreen> {
             zoomControlsEnabled: false,
             myLocationEnabled: true,
             myLocationButtonEnabled: false,
+            padding: const EdgeInsets.only(bottom: 100), // لإظهار زر الموقع فوق اللوحة
           ),
+          // حقل البحث العلوي
           Positioned(
             top: 60,
             left: 20,
@@ -169,14 +188,18 @@ class _RiderHomeScreenState extends State<RiderHomeScreen> {
                     const Icon(Icons.search,
                         color: Color(0xff007AFF), size: 28),
                     const SizedBox(width: 12),
-                    Text(_destinationText,
-                        style: const TextStyle(
-                            fontSize: 17, color: Colors.black54)),
+                    Expanded(
+                      child: Text(_destinationText,
+                          textAlign: TextAlign.right,
+                          style: const TextStyle(
+                              fontSize: 17, color: Colors.black54)),
+                    ),
                   ],
                 ),
               ),
             ),
           ),
+          // زر العودة للموقع الحالي
           if (!_isDestinationSelected)
             Positioned(
               bottom: 20,
@@ -187,6 +210,7 @@ class _RiderHomeScreenState extends State<RiderHomeScreen> {
                 child: const Icon(Icons.my_location, color: Color(0xff007AFF)),
               ),
             ),
+          // لوحة اختيار الرحلة
           AnimatedPositioned(
             duration: const Duration(milliseconds: 600),
             curve: Curves.fastOutSlowIn,
@@ -195,6 +219,7 @@ class _RiderHomeScreenState extends State<RiderHomeScreen> {
             right: 0,
             child: _buildBottomRidePanel(),
           ),
+          // شاشة التحميل (Searching)
           if (_isSearching)
             Container(
               color: Colors.black.withValues(alpha: 0.5),
@@ -206,6 +231,7 @@ class _RiderHomeScreenState extends State<RiderHomeScreen> {
     );
   }
 
+  // --- بناء لوحة اختيار نوع السيارة ---
   Widget _buildBottomRidePanel() {
     return Container(
       padding: const EdgeInsets.only(bottom: 30),
@@ -228,11 +254,11 @@ class _RiderHomeScreenState extends State<RiderHomeScreen> {
                   borderRadius: BorderRadius.circular(10))),
           const Padding(
             padding: EdgeInsets.symmetric(vertical: 15),
-            child: Text("Choose a ride",
+            child: Text("اختر نوع الرحلة",
                 style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
           ),
-          _buildRideOption(0, "Economy", "384 جـ", "🚗", "3 min away"),
-          _buildRideOption(1, "Luxury", "800 جـ", "🚙", "5 min away"),
+          _buildRideOption(0, "اقتصادية", "120 جـ", "🚗", "3 دقائق"),
+          _buildRideOption(1, "سيارة فاخرة", "250 جـ", "🚙", "5 دقائق"),
           const SizedBox(height: 20),
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 24),
@@ -244,7 +270,7 @@ class _RiderHomeScreenState extends State<RiderHomeScreen> {
                 shape: RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(16)),
               ),
-              child: const Text("Confirm Ride",
+              child: const Text("تأكيد الرحلة",
                   style: TextStyle(
                       fontSize: 18,
                       color: Colors.white,
@@ -297,9 +323,9 @@ class _RiderHomeScreenState extends State<RiderHomeScreen> {
 
   Widget _buildResultItem(String title, String sub, VoidCallback onTap) {
     return ListTile(
-      leading: const Icon(Icons.history, color: Colors.grey),
-      title: Text(title),
-      subtitle: Text(sub),
+      trailing: const Icon(Icons.history, color: Colors.grey),
+      title: Text(title, textAlign: TextAlign.right),
+      subtitle: Text(sub, textAlign: TextAlign.right),
       onTap: onTap,
     );
   }

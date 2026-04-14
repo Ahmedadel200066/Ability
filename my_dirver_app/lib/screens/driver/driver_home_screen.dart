@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
 import 'package:google_fonts/google_fonts.dart';
-import '../../mock/mock_firestore.dart';
+import 'package:supabase_flutter/supabase_flutter.dart'; // تم التغيير من Firebase إلى Supabase
 
 class DriverHomeScreen extends StatefulWidget {
   const DriverHomeScreen({super.key});
@@ -12,13 +12,14 @@ class DriverHomeScreen extends StatefulWidget {
 
 class _DriverHomeScreenState extends State<DriverHomeScreen> {
   bool isOnline = false;
+  final _supabase = Supabase.instance.client;
 
-  // دالة لجلب الطلبات المنتظرة من Firebase
-  Stream<QuerySnapshot> _getPendingTrips() {
-    return FirebaseFirestore.instance
-        .collection('trips')
-        .where('status', isEqualTo: 'pending')
-        .snapshots();
+  // دالة لجلب الطلبات المنتظرة من Supabase Realtime
+  Stream<List<Map<String, dynamic>>> _getPendingTrips() {
+    return _supabase
+        .from('rides')
+        .stream(primaryKey: ['id'])
+        .eq('status', 'searching'); // يراقب فقط الرحلات التي حالتها 'searching'
   }
 
   @override
@@ -26,7 +27,6 @@ class _DriverHomeScreenState extends State<DriverHomeScreen> {
     return Scaffold(
       body: Stack(
         children: [
-          // 1. الخريطة
           const GoogleMap(
             initialCameraPosition:
                 CameraPosition(target: LatLng(30.0444, 31.2357), zoom: 15),
@@ -34,34 +34,29 @@ class _DriverHomeScreenState extends State<DriverHomeScreen> {
             myLocationEnabled: true,
           ),
 
-          // 2. شريط الحالة العلوي
           _buildStatusHeader(),
 
-          // 3. الجزء المتغير (زر التفعيل أو مراقب الطلبات)
           Positioned(
             bottom: 30,
             left: 20,
             right: 20,
             child: isOnline
-                ? _buildTripStreamObserver() // يراقب Firebase لو السائق Online
-                : _buildGoOnlineButton(), // يعرض زر التفعيل لو السائق Offline
+                ? _buildTripStreamObserver()
+                : _buildGoOnlineButton(),
           ),
         ],
       ),
     );
   }
 
-  // مراقب الطلبات: يستمع لـ Firebase ويعرض البطاقة فوراً عند وجود طلب
   Widget _buildTripStreamObserver() {
-    return StreamBuilder<QuerySnapshot>(
+    return StreamBuilder<List<Map<String, dynamic>>>(
       stream: _getPendingTrips(),
       builder: (context, snapshot) {
-        if (snapshot.hasData && snapshot.data!.docs.isNotEmpty) {
-          // جلب بيانات أول رحلة منتظرة
-          var tripDoc = snapshot.data!.docs.first;
-          return _buildRequestCard(tripDoc);
+        if (snapshot.hasData && snapshot.data!.isNotEmpty) {
+          var tripData = snapshot.data!.first;
+          return _buildRequestCard(tripData);
         }
-        // في حال عدم وجود طلبات حالياً
         return Container(
           padding: const EdgeInsets.all(20),
           decoration: BoxDecoration(
@@ -72,7 +67,7 @@ class _DriverHomeScreenState extends State<DriverHomeScreen> {
               const SizedBox(
                 width: 20,
                 height: 20,
-                child: CircularProgressIndicator(strokeWidth: 2),
+                child: CircularProgressIndicator(strokeWidth: 2, color: Color(0xff007AFF)),
               ),
               const SizedBox(width: 15),
               Text("بانتظار طلبات قريبة...", style: GoogleFonts.cairo()),
@@ -103,11 +98,8 @@ class _DriverHomeScreenState extends State<DriverHomeScreen> {
               const CircleAvatar(radius: 5, backgroundColor: Colors.white),
               const SizedBox(width: 10),
               Text(
-                isOnline
-                    ? "أنت متصل الآن - جاهز للعمل"
-                    : "أنت غير متصل - اضغط للبدء",
-                style: GoogleFonts.cairo(
-                    color: Colors.white, fontWeight: FontWeight.bold),
+                isOnline ? "أنت متصل - جاهز للعمل" : "أنت غير متصل - اضغط للبدء",
+                style: GoogleFonts.cairo(color: Colors.white, fontWeight: FontWeight.bold),
               ),
             ],
           ),
@@ -129,9 +121,7 @@ class _DriverHomeScreenState extends State<DriverHomeScreen> {
     );
   }
 
-  Widget _buildRequestCard(DocumentSnapshot trip) {
-    Map<String, dynamic> data = trip.data;
-
+  Widget _buildRequestCard(Map<String, dynamic> data) {
     return Container(
       padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
@@ -144,30 +134,21 @@ class _DriverHomeScreenState extends State<DriverHomeScreen> {
         children: [
           Row(
             children: [
-              Text("${data['price']} جـ",
-                  style: GoogleFonts.poppins(
-                      fontSize: 24,
-                      fontWeight: FontWeight.bold,
-                      color: Colors.green)),
+              Text("اجرة تقريبية", style: GoogleFonts.cairo(fontSize: 14, color: Colors.grey)),
               const Spacer(),
-              Text("طلب من ${data['riderName']}",
-                  style: GoogleFonts.cairo(fontWeight: FontWeight.bold)),
+              Text("طلب جديد", style: GoogleFonts.cairo(fontWeight: FontWeight.bold)),
             ],
           ),
           const Divider(height: 30),
-          _locationRow(Icons.my_location,
-              "نقطة الركوب: ${data['pickupAddress'] ?? 'موقع الراكب'}"),
+          _locationRow(Icons.my_location, "الموقع: ${data['pickup_address'] ?? 'موقع العميل'}"),
           const SizedBox(height: 10),
-          _locationRow(Icons.location_on,
-              "الوجهة: ${data['dropoffAddress'] ?? 'وجهة الراكب'}"),
+          _locationRow(Icons.location_on, "الوجهة: ${data['destination_name'] ?? 'وجهة غير محددة'}"),
           const SizedBox(height: 25),
           Row(
             children: [
               Expanded(
                 child: ElevatedButton(
-                  onPressed: () {
-                    // هنا يمكن رفض الطلب محلياً
-                  },
+                  onPressed: () {},
                   style: ElevatedButton.styleFrom(
                       backgroundColor: Colors.grey[200],
                       foregroundColor: Colors.black),
@@ -177,11 +158,9 @@ class _DriverHomeScreenState extends State<DriverHomeScreen> {
               const SizedBox(width: 15),
               Expanded(
                 child: ElevatedButton(
-                  onPressed: () => _acceptTrip(trip.id),
-                  style: ElevatedButton.styleFrom(
-                      backgroundColor: const Color(0xff007AFF)),
-                  child: Text("قبول الرحلة",
-                      style: GoogleFonts.cairo(color: Colors.white)),
+                  onPressed: () => _acceptTrip(data['id'].toString()),
+                  style: ElevatedButton.styleFrom(backgroundColor: const Color(0xff007AFF)),
+                  child: Text("قبول الرحلة", style: GoogleFonts.cairo(color: Colors.white)),
                 ),
               ),
             ],
@@ -191,16 +170,24 @@ class _DriverHomeScreenState extends State<DriverHomeScreen> {
     );
   }
 
-  // دالة قبول الرحلة وتحديث حالتها في Firebase
+  // دالة قبول الرحلة وتحديث حالتها في Supabase
   void _acceptTrip(String tripId) async {
-    await FirebaseFirestore.instance.collection('trips').doc(tripId).update({
-      'status': 'accepted',
-      'driverId': 'current_driver_id', // استبدله بـ ID السائق الحقيقي
-    });
+    final user = _supabase.auth.currentUser;
+    if (user == null) return;
 
-    // الانتقال لشاشة الرحلة النشطة
-    if (mounted) {
-      Navigator.pushNamed(context, '/active_trip');
+    try {
+      await _supabase.from('rides').update({
+        'status': 'accepted',
+        'driver_id': user.id, // ID السائق الحقيقي من سوبابيز
+      }).eq('id', tripId);
+
+      if (mounted) {
+        Navigator.pushNamed(context, '/active_trip');
+      }
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text("فشل قبول الرحلة: $e")),
+      );
     }
   }
 
@@ -210,9 +197,7 @@ class _DriverHomeScreenState extends State<DriverHomeScreen> {
         Icon(icon, size: 18, color: Colors.blue),
         const SizedBox(width: 10),
         Expanded(
-            child: Text(text,
-                style: GoogleFonts.cairo(fontSize: 14),
-                textAlign: TextAlign.right)),
+            child: Text(text, style: GoogleFonts.cairo(fontSize: 14), textAlign: TextAlign.right)),
       ],
     );
   }

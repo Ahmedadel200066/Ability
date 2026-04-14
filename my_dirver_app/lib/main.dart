@@ -2,6 +2,11 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
+
+// استيراد البروفايدر اللي عملناه
+import 'package:my_driver_app/providers/auth_provider.dart';
+
 import 'package:my_driver_app/screens/login_screen.dart';
 import 'package:my_driver_app/screens/shared/signup_screen.dart';
 import 'package:my_driver_app/screens/rider/rider_home_screen.dart';
@@ -11,6 +16,11 @@ import 'package:my_driver_app/screens/rider/wallet_screen.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
+
+  await Supabase.initialize(
+    url: 'https://njsxgrexdgekelxwgang.supabase.co',
+    anonKey: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im5qc3hncmV4ZGdla2VseHdnYW5nIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzYwOTg2MDAsImV4cCI6MjA5MTY3NDYwMH0.KWCjNDh0PKkc6s-4obLr6TRSW9Lm33zz_PDearf6XBU',
+  );
 
   runApp(
     const ProviderScope(child: EliteApp()),
@@ -22,6 +32,9 @@ class EliteApp extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    // مراقبة حالة المصادقة من الـ authProvider
+    final authState = ref.watch(authProvider);
+
     return MaterialApp(
       title: 'Elite Rider',
       debugShowCheckedModeBanner: false,
@@ -43,20 +56,25 @@ class EliteApp extends ConsumerWidget {
           secondary: const Color(0xff1C2541),
           surface: Colors.white,
         ),
-        elevatedButtonTheme: ElevatedButtonThemeData(
-          style: ElevatedButton.styleFrom(
-            backgroundColor: const Color(0xff007AFF),
-            foregroundColor: Colors.white,
-            textStyle: GoogleFonts.cairo(fontWeight: FontWeight.bold),
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(12),
-            ),
-          ),
+      ),
+      // هنا الـ Logic الاحترافي لتحديد أول شاشة تظهر
+      home: authState.when(
+        data: (session) {
+          if (session != null) {
+            return const RiderHomeScreen(); // لو مسجل دخول يفتح الهوم
+          } else {
+            return const SignupScreen(); // لو مش مسجل يفتح الساين أب
+          }
+        },
+        loading: () => const Scaffold(
+          body: Center(child: CircularProgressIndicator()),
+        ),
+        error: (err, stack) => Scaffold(
+          body: Center(child: Text("حدث خطأ في الاتصال: $err")),
         ),
       ),
-      initialRoute: '/signup',
       routes: {
-        '/signup': (context) => SignupScreen(),
+        '/signup': (context) => const SignupScreen(),
         '/login': (context) => const LoginScreen(),
         '/home': (context) => const RiderHomeScreen(),
         '/profile': (context) => const ProfileScreen(),
